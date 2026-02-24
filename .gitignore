@@ -4,3 +4,4 @@ dist/
 *.py[cod]
 __pycache__/
 .env
+notes.md
