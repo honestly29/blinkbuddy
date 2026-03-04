@@ -1,7 +1,8 @@
 node_modules/
 dist/
-.vite/
-*.py[cod]
+dist-electron/
 __pycache__/
-.env
-notes.md
+.venv/
+*.pyc
+.DS_Store
+python/models/
