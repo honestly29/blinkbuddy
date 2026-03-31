@@ -1,9 +1,7 @@
-// Import Electron APIs
-// app manages the application lifecycle
-// BrowserWindow is used to create and control application windows
 import { app, BrowserWindow } from 'electron'
 import path from 'node:path'
 import { PythonBridge } from './python-bridge'
+import { SessionManager } from './session-manager'
 import { registerIpcHandlers } from './ipc-handlers'
 
 let mainWindow: BrowserWindow | null = null
@@ -32,8 +30,18 @@ app.whenReady().then(() => {
   pythonBridge = new PythonBridge()
   pythonBridge.spawn()
 
+  // Create session manager
+  const sessionManager = new SessionManager({
+    bridge: pythonBridge,
+    sendToRenderer: (channel, data) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send(channel, data)
+      }
+    },
+  })
+
   // Register IPC handlers before creating the window
-  registerIpcHandlers(pythonBridge, () => mainWindow)
+  registerIpcHandlers(pythonBridge, sessionManager, () => mainWindow)
 
   createWindow()
 })

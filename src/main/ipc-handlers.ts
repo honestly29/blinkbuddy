@@ -7,25 +7,29 @@ import { ipcMain, type BrowserWindow } from 'electron'
 import { IPC_CHANNELS } from '../shared/ipc-messages'
 import type { StartArgs, SetPreviewArgs, UserSettings, SessionSummary } from '../shared/ipc-messages'
 import type { PythonBridge } from './python-bridge'
+import type { SessionManager } from './session-manager'
 import type { CameraInfo } from '../shared/protocol'
 
 /**
- * Register all IPC handlers. Call once after creating the PythonBridge.
+ * Register all IPC handlers. Call once after creating the PythonBridge
+ * and SessionManager.
  */
 export function registerIpcHandlers(
   bridge: PythonBridge,
+  sessionManager: SessionManager,
   getMainWindow: () => BrowserWindow | null,
 ): void {
   ipcMain.handle(IPC_CHANNELS.START, (_event, args?: StartArgs) => {
-    bridge.send({
-      type: 'start',
-      camera_index: args?.cameraIndex ?? 0,
-      preview_enabled: args?.previewEnabled ?? false,
+    sessionManager.start({
+      cameraIndex: args?.cameraIndex ?? 0,
+      previewEnabled: args?.previewEnabled ?? false,
+      blinkWindowSeconds: args?.blinkWindowSeconds ?? 20,
+      twentyTwentyEnabled: args?.twentyTwentyEnabled ?? true,
     })
   })
 
   ipcMain.handle(IPC_CHANNELS.STOP, () => {
-    bridge.send({ type: 'stop' })
+    sessionManager.stop()
   })
 
   ipcMain.handle(IPC_CHANNELS.SET_PREVIEW, (_event, args: SetPreviewArgs) => {
@@ -53,13 +57,13 @@ export function registerIpcHandlers(
       }),
   )
 
-  // Stub handlers for future (settings / session history)
+  // Stub handlers for settings / session history
   ipcMain.handle(IPC_CHANNELS.GET_SESSION_HISTORY, (): SessionSummary[] => {
     return []
   })
 
   ipcMain.handle(IPC_CHANNELS.SAVE_SETTINGS, (_event, _settings: UserSettings) => {
-    // persist to disk
+    // 
   })
 
   ipcMain.handle(IPC_CHANNELS.LOAD_SETTINGS, (): UserSettings => {
