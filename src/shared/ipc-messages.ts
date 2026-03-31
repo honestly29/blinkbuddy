@@ -6,6 +6,7 @@
  */
 
 import type { CameraInfo, PythonEvent } from './protocol'
+import type { ReminderState, TwentyTwentyState } from '../domain/types'
 
 // ---------------------------------------------------------------------------
 // IPC channel names
@@ -20,6 +21,7 @@ export const IPC_CHANNELS = {
   SAVE_SETTINGS: 'blink:save-settings',
   LOAD_SETTINGS: 'blink:load-settings',
   PYTHON_EVENT: 'blink:python-event',
+  STATE_UPDATE: 'blink:state-update',
 } as const
 
 // ---------------------------------------------------------------------------
@@ -29,6 +31,8 @@ export const IPC_CHANNELS = {
 export interface StartArgs {
   cameraIndex?: number
   previewEnabled?: boolean
+  blinkWindowSeconds?: number
+  twentyTwentyEnabled?: boolean
 }
 
 export interface SetPreviewArgs {
@@ -49,6 +53,24 @@ export interface SessionSummary {
   avgBlinksPerMinute: number
   remindersTriggered: number
   totalDurationSeconds: number
+}
+
+// ---------------------------------------------------------------------------
+// Consolidated state update pushed from Session Manager to renderer
+// ---------------------------------------------------------------------------
+
+export interface StateUpdate {
+  type: 'state_update'
+  running: boolean
+  reminderState: ReminderState
+  shouldShowReminder: boolean
+  blinksPerMinute: number
+  totalBlinks: number
+  sessionDurationMs: number
+  faceDetected: boolean
+  twentyTwentyState: TwentyTwentyState
+  remindersTriggered: number
+  error?: string
 }
 
 // ---------------------------------------------------------------------------
