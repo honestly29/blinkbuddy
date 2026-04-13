@@ -86,6 +86,7 @@ export interface BlinkBuddyAPI {
   saveSettings: (settings: UserSettings) => Promise<void>
   loadSettings: () => Promise<UserSettings>
   onPythonEvent: (callback: (event: PythonEvent) => void) => () => void
+  onStateUpdate: (callback: (state: StateUpdate) => void) => () => void
 }
 
 declare global {
