@@ -1,6 +1,9 @@
 /**
  * Registers ipcMain.handle() endpoints that the renderer calls
  * via the contextBridge-exposed blinkBuddy API.
+ * 
+ * Each handler corresponds to one method on the BlinkBuddyAPI interface
+ * (defined in ipc-messages.ts) and is invoked by ipcRenderer.invoke() in the preload script.
  */
 
 import { ipcMain, type BrowserWindow } from 'electron'
@@ -8,22 +11,26 @@ import { IPC_CHANNELS } from '../shared/ipc-messages'
 import type { StartArgs, SetPreviewArgs, UserSettings, SessionSummary } from '../shared/ipc-messages'
 import type { PythonBridge } from './python-bridge'
 import type { SessionManager } from './session-manager'
+import type { SettingsStore } from './settings-store'
 import type { CameraInfo } from '../shared/protocol'
 
 /**
- * Register all IPC handlers. Call once after creating the PythonBridge
- * and SessionManager.
+ * Register all IPC handlers. Call once after creating the PythonBridge, SessionManager, and SettingsStore.
  */
 export function registerIpcHandlers(
   bridge: PythonBridge,
   sessionManager: SessionManager,
   getMainWindow: () => BrowserWindow | null,
+  settingsStore: SettingsStore,
 ): void {
+  // -- Session control handlers --
+
   ipcMain.handle(IPC_CHANNELS.START, (_event, args?: StartArgs) => {
     sessionManager.start({
+      // Forward the user's settings to the Session Manager.
       cameraIndex: args?.cameraIndex ?? 0,
       previewEnabled: args?.previewEnabled ?? false,
-      blinkWindowSeconds: args?.blinkWindowSeconds ?? 20,
+      blinkWindowSeconds: args?.blinkWindowSeconds ?? 10,
       twentyTwentyEnabled: args?.twentyTwentyEnabled ?? true,
     })
   })
@@ -32,7 +39,10 @@ export function registerIpcHandlers(
     sessionManager.stop()
   })
 
+  // -- Python bridge command handlers --
   ipcMain.handle(IPC_CHANNELS.SET_PREVIEW, (_event, args: SetPreviewArgs) => {
+    // Send the command directly to the Python process via stdin.
+    // This is the only setting that can be changed mid-session.
     bridge.send({ type: 'set_preview', enabled: args.enabled })
   })
 
@@ -40,6 +50,7 @@ export function registerIpcHandlers(
     IPC_CHANNELS.LIST_CAMERAS,
     () =>
       new Promise<CameraInfo[]>((resolve) => {
+        // Register a one-shot listener for the camera_list response.
         const onEvent = (event: import('../shared/protocol').PythonEvent) => {
           if (event.type === 'camera_list') {
             bridge.removeListener('event', onEvent)
@@ -47,6 +58,7 @@ export function registerIpcHandlers(
           }
         }
         bridge.on('event', onEvent)
+        // Ask the Python process to enumerate available cameras
         bridge.send({ type: 'list_cameras' })
 
         // Timeout after 5 seconds
@@ -57,22 +69,18 @@ export function registerIpcHandlers(
       }),
   )
 
-  // Stub handlers for settings / session history
+  // Stub handler for session history
   ipcMain.handle(IPC_CHANNELS.GET_SESSION_HISTORY, (): SessionSummary[] => {
     return []
   })
 
-  ipcMain.handle(IPC_CHANNELS.SAVE_SETTINGS, (_event, _settings: UserSettings) => {
-    // 
+  // -- Settings persistence handlers --
+  ipcMain.handle(IPC_CHANNELS.SAVE_SETTINGS, (_event, settings: UserSettings) => {
+    settingsStore.save(settings)
   })
 
   ipcMain.handle(IPC_CHANNELS.LOAD_SETTINGS, (): UserSettings => {
-    return {
-      blinkWindowSeconds: 20,
-      cameraIndex: 0,
-      previewEnabled: false,
-      twentyTwentyEnabled: true,
-    }
+    return settingsStore.load()
   })
 
   // Forward Python events to the renderer

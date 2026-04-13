@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import type { StateUpdate } from '../../shared/ipc-messages'
+import type { StartArgs, StateUpdate } from '../../shared/ipc-messages'
 import type { ReminderState, TwentyTwentyState } from '../../domain/types'
 
 // The state exposed by useBlinkMonitor to React components
@@ -52,17 +52,17 @@ export function useBlinkMonitor() {
     })
     // Return the unsubscribe function as the useEffect cleanup
     return unsubscribe
-  }, []) // Empty dependency array: subscribe once on mount, clean up once on unmount
+  }, []) 
 
-   // Wrap IPC calls in useCallback so they maintain a stable function reference across re-renders
-  const start = useCallback(async () => {
-    await window.blinkBuddy.start()
+  // Wrap IPC calls in useCallback so they maintain a stable function reference across re-renders
+  const start = useCallback(async (args?: StartArgs) => {
+    await window.blinkBuddy.start(args)
   }, [])
 
   const stop = useCallback(async () => {
     await window.blinkBuddy.stop()
   }, [])
 
-  // Spread all state fields plus the two action functions into one flat object
+  // Spread all state fields plus start/stop functions into one flat object
   return { ...state, start, stop }
 }

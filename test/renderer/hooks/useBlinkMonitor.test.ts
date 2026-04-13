@@ -3,7 +3,7 @@ import { renderHook, act } from '@testing-library/react'
 import { useBlinkMonitor } from '../../../src/renderer/hooks/useBlinkMonitor'
 import type { StateUpdate } from '../../../src/shared/ipc-messages'
 
-// --- Mock functions for the window.blinkBuddy API ---
+// Mock functions for the window.blinkBuddy API
 const mockStart = vi.fn().mockResolvedValue(undefined)
 const mockStop = vi.fn().mockResolvedValue(undefined)
 
@@ -12,7 +12,7 @@ let stateCallback: ((state: StateUpdate) => void) | null = null
 const mockUnsubscribe = vi.fn()
 
 beforeEach(() => {
-  // Reset all mocks and captured references before each tes
+  // Reset all mocks and captured references before each test
   stateCallback = null
   mockStart.mockClear()
   mockStop.mockClear()
@@ -43,7 +43,7 @@ describe('useBlinkMonitor', () => {
     // The unsubscribe function should NOT have been called yet
     expect(mockUnsubscribe).not.toHaveBeenCalled()
 
-    // Trigger unmount - this should invoke the useEffect cleanup
+    // Trigger unmount - should invoke the useEffect cleanup
     unmount()
     // Now the unsubscribe function should have been called to remove the listener
     expect(mockUnsubscribe).toHaveBeenCalledOnce()
@@ -93,15 +93,27 @@ describe('useBlinkMonitor', () => {
     expect(result.current.faceDetected).toBe(true)
   })
 
-  it('start() calls window.blinkBuddy.start()', async () => {
+  it('start() calls window.blinkBuddy.start() with no args', async () => {
     const { result } = renderHook(() => useBlinkMonitor())
 
-    // Use async act() because start() returns a Promise (async IPC call)
     await act(async () => {
       await result.current.start()
     })
 
-    expect(mockStart).toHaveBeenCalledOnce()
+    // Calling start() without arguments should pass undefined
+    expect(mockStart).toHaveBeenCalledWith(undefined)
+  })
+
+  it('start() forwards StartArgs to window.blinkBuddy.start()', async () => {
+    const { result } = renderHook(() => useBlinkMonitor())
+    const args = { cameraIndex: 1, blinkWindowSeconds: 30 }
+
+    await act(async () => {
+      await result.current.start(args)
+    })
+
+    // The StartArgs object should be forwarded to the IPC call as-is
+    expect(mockStart).toHaveBeenCalledWith(args)
   })
 
   it('stop() calls window.blinkBuddy.stop()', async () => {

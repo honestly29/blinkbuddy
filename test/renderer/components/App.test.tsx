@@ -1,10 +1,20 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, act, fireEvent, waitFor } from '@testing-library/react'
 import App from '../../../src/renderer/App'
-import type { StateUpdate } from '../../../src/shared/ipc-messages'
+import type { StateUpdate, UserSettings } from '../../../src/shared/ipc-messages'
 
+const defaultSettings: UserSettings = {
+  blinkWindowSeconds: 20,
+  cameraIndex: 0,
+  previewEnabled: false,
+  twentyTwentyEnabled: true,
+}
 const mockStart = vi.fn().mockResolvedValue(undefined)
 const mockStop = vi.fn().mockResolvedValue(undefined)
+const mockSaveSettings = vi.fn().mockResolvedValue(undefined)
+const mockLoadSettings = vi.fn().mockResolvedValue(defaultSettings)
+const mockListCameras = vi.fn().mockResolvedValue([])    
+const mockSetPreview = vi.fn().mockResolvedValue(undefined)
 let stateCallback: ((state: StateUpdate) => void) | null = null
 const mockUnsubscribe = vi.fn()
 
@@ -29,11 +39,19 @@ beforeEach(() => {
   stateCallback = null
   mockStart.mockClear()
   mockStop.mockClear()
+  mockSaveSettings.mockClear()
+  mockLoadSettings.mockClear().mockResolvedValue(defaultSettings)
+  mockListCameras.mockClear().mockResolvedValue([])
+  mockSetPreview.mockClear()
   mockUnsubscribe.mockClear()
 
   window.blinkBuddy = {
     start: mockStart,
     stop: mockStop,
+    saveSettings: mockSaveSettings,
+    loadSettings: mockLoadSettings,
+    listCameras: mockListCameras,
+    setPreview: mockSetPreview,
     onStateUpdate: vi.fn((cb) => {
       stateCallback = cb
       return mockUnsubscribe
@@ -60,10 +78,19 @@ describe('App', () => {
     expect(screen.getByText('0.0')).toBeDefined()  // BlinkStatsPanel blinks/min
   })
 
+  // Verify the settings panel is rendered with all sub-components
+  it('renders settings panel', () => {
+    render(<App />)
+
+    expect(screen.getByText('Settings')).toBeDefined()
+    expect(screen.getByText('Camera')).toBeDefined()
+    expect(screen.getByText('Blink window (seconds)')).toBeDefined()
+    expect(screen.getByText('20-20-20 break reminders')).toBeDefined()
+    expect(screen.getByText('Camera preview')).toBeDefined()
+  })
   
   it('updates to running state with face detected', () => {
     render(<App />)
-
     // Simulate a state update arriving from the main process via IPC.
     act(() => {
       stateCallback!(makeStateUpdate({
@@ -124,14 +151,21 @@ describe('App', () => {
     expect(screen.getByText('Camera disconnected')).toBeDefined()
   })
 
-  
-  it('calls start when Start Monitoring is clicked', async () => {
+  // verifies that start() is called with the full StartArgs
+  // object containing the user's settings
+  it('calls start with settings when Start Monitoring is clicked', async () => {
     render(<App />)
 
     fireEvent.click(screen.getByText('Start Monitoring'))
 
     await waitFor(() => {
-      expect(mockStart).toHaveBeenCalledOnce()
+      // handleStart should package the default settings into StartArgs
+      expect(mockStart).toHaveBeenCalledWith({
+        cameraIndex: 0,
+        previewEnabled: false,
+        blinkWindowSeconds: 20,
+        twentyTwentyEnabled: true,
+      })
     })
   })
 
@@ -139,6 +173,7 @@ describe('App', () => {
   it('calls stop when Stop Monitoring is clicked', async () => {
     render(<App />)
 
+    // First, transition to running state so the Stop button appears
     act(() => {
       stateCallback!(makeStateUpdate({ running: true }))
     })
@@ -148,5 +183,13 @@ describe('App', () => {
     await waitFor(() => {
       expect(mockStop).toHaveBeenCalledOnce()
     })
+  })
+
+  // Verify that both hooks fire their initial data fetches on mount
+  it('loads settings and cameras on mount', () => {
+    render(<App />)
+
+    expect(mockLoadSettings).toHaveBeenCalledOnce()
+    expect(mockListCameras).toHaveBeenCalledOnce()
   })
 })
