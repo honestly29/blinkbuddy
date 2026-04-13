@@ -6,10 +6,11 @@ import { BlinkStatsPanel } from './components/BlinkStatsPanel'
 import { SettingsPanel } from './components/SettingsPanel'
 import { StartStopControls } from './components/StartStopControls'
 import { ReminderOverlay } from './components/ReminderOverlay'
+import { TwentyTwentyOverlay } from './components/TwentyTwentyOverlay'
+import { CvsTipsPanel } from './components/CvsTipsPanel'
 
 function App() {
   // -- Hook 1: Monitoring state and actions --
-  // Provides running status, blink metrics, and start/stop functions.
   const {
     running,
     blinksPerMinute,
@@ -17,14 +18,13 @@ function App() {
     sessionDurationMs,
     faceDetected,
     shouldShowReminder,
+    twentyTwentyState,
     error,
     start,
     stop,
   } = useBlinkMonitor()
 
   // -- Hook 2: Settings state and setters --
-  // Provides user preferences, camera list, and setter functions.
-  // Each hook manages its own concern independently.
   const {
     settings,
     cameras,
@@ -36,12 +36,8 @@ function App() {
   } = useSettings()
 
 
-   /**
-   * Bridge between the two hooks: packages the current settings
-   * into a StartArgs object when the user clicks "Start Monitoring".
-   *
-   * The dependency array includes `settings` so it always reads the latest values. 
-   */
+   // Package the current settings into StartArgs when starting a session.
+  // Dependency array includes `settings` so we always read the latest values.
   const handleStart = useCallback(async () => {
     await start({
       cameraIndex: settings.cameraIndex,
@@ -51,10 +47,8 @@ function App() {
     })
   }, [start, settings])
 
-  /**
-   * Bridge between the two hooks: injects the current `running` state into the preview setter.
-   * When running is true, setPreviewEnabled also sends a set_preview IPC command to the Python process.
-   */
+  // Bridge between the two hooks: injects the `running` state into
+  // the preview setter so it can send a set_preview IPC command mid-session.
   const handlePreviewChange = useCallback(
     (enabled: boolean) => {
       setPreviewEnabled(enabled, running)
@@ -80,8 +74,7 @@ function App() {
           sessionDurationMs={sessionDurationMs}
         />
 
-        {/* Settings panel receives both settings state and the running flag.
-            The running flag controls which settings are disabled mid-session. */}
+        {/* Settings panel receives both settings state and the running flag */}
         <SettingsPanel
           settings={settings}
           cameras={cameras}
@@ -100,13 +93,20 @@ function App() {
           </div>
         )}
 
+        {/*  Static CVS health tips */}
+        <CvsTipsPanel />
+
         <div className="mt-auto">
-          {/* onStart uses handleStart (which packages settings) instead of raw start() */}
           <StartStopControls running={running} onStart={handleStart} onStop={stop} />
         </div>
       </main>
 
+      {/* -- Overlay layers -- */}
       <ReminderOverlay visible={shouldShowReminder} />
+      <TwentyTwentyOverlay
+        phase={twentyTwentyState.phase}
+        breakTimeRemainingMs={twentyTwentyState.breakTimeRemainingMs}
+      />
     </div>
   )
 }
