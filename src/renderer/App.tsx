@@ -3,6 +3,7 @@ import { useBlinkMonitor } from './hooks/useBlinkMonitor'
 import { useSettings } from './hooks/useSettings'
 import { StatusPanel } from './components/StatusPanel'
 import { BlinkStatsPanel } from './components/BlinkStatsPanel'
+import { PreviewCanvas } from './components/PreviewCanvas'
 import { SettingsPanel } from './components/SettingsPanel'
 import { StartStopControls } from './components/StartStopControls'
 import { ReminderOverlay } from './components/ReminderOverlay'
@@ -73,6 +74,9 @@ function App() {
           totalBlinks={totalBlinks}
           sessionDurationMs={sessionDurationMs}
         />
+
+        {/* Live camera preview with face mesh overlay. */}
+        <PreviewCanvas visible={settings.previewEnabled && running} />
 
         {/* Settings panel receives both settings state and the running flag */}
         <SettingsPanel
