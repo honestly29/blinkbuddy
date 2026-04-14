@@ -2,8 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { UserSettings } from '../shared/ipc-messages'
 
-// defaults for all user-configurable settings
-// Exported so tests can reference these values without hardcoding them
+// Defaults for all user-configurable settings
 export const DEFAULT_SETTINGS: UserSettings = {
   blinkWindowSeconds: 20,
   cameraIndex: 0,
@@ -24,8 +23,7 @@ export class SettingsStore {
   }
 
    /**
-   * Load settings from disk. Returns defaults if the file doesn't exist (first run)
-   * or contains invalid JSON (corruption, manual editing).
+   * Load settings from disk. Returns defaults if the file doesn't exist (first run) or contains invalid JSON (corruption, manual editing).
    * The try/catch handles both cases so the app always starts cleanly.
    */
   load(): UserSettings {

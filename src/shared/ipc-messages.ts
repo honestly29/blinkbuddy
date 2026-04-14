@@ -12,6 +12,7 @@ import type { ReminderState, TwentyTwentyState } from '../domain/types'
 // IPC channel names
 // ---------------------------------------------------------------------------
 
+/**  String constants for all IPC channels used between main and renderer.*/
 export const IPC_CHANNELS = {
   START: 'blink:start',
   STOP: 'blink:stop',
@@ -22,12 +23,13 @@ export const IPC_CHANNELS = {
   LOAD_SETTINGS: 'blink:load-settings',
   PYTHON_EVENT: 'blink:python-event',
   STATE_UPDATE: 'blink:state-update',
-} as const
+} as const  
 
 // ---------------------------------------------------------------------------
 // Channel argument/return types
 // ---------------------------------------------------------------------------
 
+/** Arguments passed to the START handler when beginning a monitoring session. */
 export interface StartArgs {
   cameraIndex?: number
   previewEnabled?: boolean
@@ -39,6 +41,7 @@ export interface SetPreviewArgs {
   enabled: boolean
 }
 
+/** User-configurable preferences persisted to settings.json. */
 export interface UserSettings {
   blinkWindowSeconds: number
   cameraIndex: number
@@ -46,19 +49,24 @@ export interface UserSettings {
   twentyTwentyEnabled: boolean
 }
 
+/** Summary of a completed monitoring session, persisted to sessions.json. */
 export interface SessionSummary {
-  sessionStart: string
-  sessionEnd: string
+  sessionStart: string    // ISO 8601 timestamp
+  sessionEnd: string      // ISO 8601 timestamp
   totalBlinks: number
   avgBlinksPerMinute: number
   remindersTriggered: number
   totalDurationSeconds: number
+  twentyTwentyBreaksTaken: number
+  longestGapBetweenBlinks: number
+  blinkRateStdDev: number
 }
 
 // ---------------------------------------------------------------------------
 // Consolidated state update pushed from Session Manager to renderer
 // ---------------------------------------------------------------------------
 
+/** Snapshot of all monitoring state, sent to the renderer on every change. */
 export interface StateUpdate {
   type: 'state_update'
   running: boolean
@@ -77,7 +85,9 @@ export interface StateUpdate {
 // Preload API shape exposed to renderer via contextBridge
 // ---------------------------------------------------------------------------
 
+/** The complete API surface available as window.blinkBuddy in the renderer. */
 export interface BlinkBuddyAPI {
+  // Command methods (request/response via ipcRenderer.invoke)
   start: (args?: StartArgs) => Promise<void>
   stop: () => Promise<void>
   setPreview: (args: SetPreviewArgs) => Promise<void>
@@ -85,10 +95,13 @@ export interface BlinkBuddyAPI {
   getSessionHistory: () => Promise<SessionSummary[]>
   saveSettings: (settings: UserSettings) => Promise<void>
   loadSettings: () => Promise<UserSettings>
+
+  // Event subscription methods (push-based via ipcRenderer.on)
   onPythonEvent: (callback: (event: PythonEvent) => void) => () => void
   onStateUpdate: (callback: (state: StateUpdate) => void) => () => void
 }
 
+/** Augment the Window interface so window.blinkBuddy is typed globally. */
 declare global {
   interface Window {
     blinkBuddy: BlinkBuddyAPI

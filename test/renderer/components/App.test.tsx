@@ -15,6 +15,7 @@ const mockSaveSettings = vi.fn().mockResolvedValue(undefined)
 const mockLoadSettings = vi.fn().mockResolvedValue(defaultSettings)
 const mockListCameras = vi.fn().mockResolvedValue([])    
 const mockSetPreview = vi.fn().mockResolvedValue(undefined)
+const mockGetSessionHistory = vi.fn().mockResolvedValue([])
 let stateCallback: ((state: StateUpdate) => void) | null = null
 const mockUnsubscribe = vi.fn()
 
@@ -43,6 +44,7 @@ beforeEach(() => {
   mockLoadSettings.mockClear().mockResolvedValue(defaultSettings)
   mockListCameras.mockClear().mockResolvedValue([])
   mockSetPreview.mockClear()
+  mockGetSessionHistory.mockClear().mockResolvedValue([])
   mockUnsubscribe.mockClear()
 
   window.blinkBuddy = {
@@ -52,6 +54,7 @@ beforeEach(() => {
     loadSettings: mockLoadSettings,
     listCameras: mockListCameras,
     setPreview: mockSetPreview,
+    getSessionHistory: mockGetSessionHistory,
     onStateUpdate: vi.fn((cb) => {
       stateCallback = cb
       return mockUnsubscribe

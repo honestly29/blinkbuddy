@@ -551,31 +551,37 @@ describe('SessionManager', () => {
     it('returns correct summary data', () => {
       manager.start(DEFAULT_CONFIG)
 
-      // Record some blinks
+      // Record some blinks with 1-second intervals
       bridge.emit('event', blinkEvent(1000))
       bridge.emit('event', blinkEvent(2000))
       bridge.emit('event', blinkEvent(3000))
 
-      // Trigger one reminder
+      // Advance time to trigger one reminder (blink window expires)
       vi.advanceTimersByTime(15_000)
 
+      // Set the system clock for getSessionSummary() to compute duration
       vi.setSystemTime(15_000)
       const summary = manager.getSessionSummary()
 
       expect(summary.totalBlinks).toBe(3)
       expect(summary.remindersTriggered).toBe(1)
-      expect(summary.totalDurationMs).toBe(15_000)
-      expect(summary.sessionStart).toBe(0)
-      expect(summary.sessionEnd).toBe(15_000)
+      expect(summary.totalDurationSeconds).toBe(15)
+      expect(summary.sessionStart).toBe(new Date(0).toISOString())
+      expect(summary.sessionEnd).toBe(new Date(15_000).toISOString())
       expect(summary.avgBlinksPerMinute).toBeCloseTo(12, 0) // 3 blinks / 0.25 min = 12
+      expect(summary.twentyTwentyBreaksTaken).toBe(0)
+      expect(summary.longestGapBetweenBlinks).toBe(1) // 1000ms gap = 1s
+      // Equal intervals (all 1000ms) have zero standard deviation
+      expect(summary.blinkRateStdDev).toBe(0) 
     })
 
     it('returns zero averages when no duration', () => {
+      // No session started: all metrics should be zero
       const summary = manager.getSessionSummary()
 
       expect(summary.totalBlinks).toBe(0)
       expect(summary.avgBlinksPerMinute).toBe(0)
-      expect(summary.totalDurationMs).toBe(0)
+      expect(summary.totalDurationSeconds).toBe(0)
     })
   })
 

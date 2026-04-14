@@ -9,6 +9,8 @@ import { StartStopControls } from './components/StartStopControls'
 import { ReminderOverlay } from './components/ReminderOverlay'
 import { TwentyTwentyOverlay } from './components/TwentyTwentyOverlay'
 import { CvsTipsPanel } from './components/CvsTipsPanel'
+import { SessionHistory } from './components/SessionHistory'
+
 
 function App() {
   // -- Hook 1: Monitoring state and actions --
@@ -100,12 +102,15 @@ function App() {
         {/*  Static CVS health tips */}
         <CvsTipsPanel />
 
+        {/* Session history */}
+        <SessionHistory />
+
         <div className="mt-auto">
           <StartStopControls running={running} onStart={handleStart} onStop={stop} />
         </div>
       </main>
 
-      {/* -- Overlay layers -- */}
+      {/* -- Overlay layers (fixed position, outside normal flow) -- */}
       <ReminderOverlay visible={shouldShowReminder} />
       <TwentyTwentyOverlay
         phase={twentyTwentyState.phase}

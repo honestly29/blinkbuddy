@@ -12,16 +12,22 @@ import type { StartArgs, SetPreviewArgs, UserSettings, SessionSummary } from '..
 import type { PythonBridge } from './python-bridge'
 import type { SessionManager } from './session-manager'
 import type { SettingsStore } from './settings-store'
+import type { SessionLogger } from './session-logger'
 import type { CameraInfo } from '../shared/protocol'
 
-/**
- * Register all IPC handlers. Call once after creating the PythonBridge, SessionManager, and SettingsStore.
+
+/** 
+ * Register all IPC handlers. Call once after creating all dependencies.
+ * 
+ * Accepts five injected dependencies (bridge, sessionManager,
+ * getMainWindow, settingsStore, sessionLogger).
  */
 export function registerIpcHandlers(
   bridge: PythonBridge,
   sessionManager: SessionManager,
   getMainWindow: () => BrowserWindow | null,
   settingsStore: SettingsStore,
+  sessionLogger: SessionLogger,
 ): void {
   // -- Session control handlers --
 
@@ -35,8 +41,21 @@ export function registerIpcHandlers(
     })
   })
 
+  /**
+   * STOP handler: captures the session summary BEFORE calling stop().
+   *
+   *   1. getSessionSummary() - capture metrics while domain objects are still active
+   *   2. stop() - resets timers and pushes final "stopped" state to renderer
+   *   3. sessionLogger.append() - persist the captured summary to disk
+   */
   ipcMain.handle(IPC_CHANNELS.STOP, () => {
-    sessionManager.stop()
+    if (sessionManager.isRunning()) {
+      const summary = sessionManager.getSessionSummary()
+      sessionManager.stop()
+      sessionLogger.append(summary)
+    } else {
+      sessionManager.stop()
+    }
   })
 
   // -- Python bridge command handlers --
@@ -50,7 +69,7 @@ export function registerIpcHandlers(
     IPC_CHANNELS.LIST_CAMERAS,
     () =>
       new Promise<CameraInfo[]>((resolve) => {
-        // Register a one-shot listener for the camera_list response.
+        // Register listener for the camera_list response.
         const onEvent = (event: import('../shared/protocol').PythonEvent) => {
           if (event.type === 'camera_list') {
             bridge.removeListener('event', onEvent)
@@ -69,9 +88,9 @@ export function registerIpcHandlers(
       }),
   )
 
-  // Stub handler for session history
+  // Delegates to the session logger
   ipcMain.handle(IPC_CHANNELS.GET_SESSION_HISTORY, (): SessionSummary[] => {
-    return []
+    return sessionLogger.getAll()
   })
 
   // -- Settings persistence handlers --
