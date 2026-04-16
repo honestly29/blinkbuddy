@@ -6,7 +6,7 @@ import time
 import cv2
 
 from python.config import load_config
-from python.camera import Camera, list_cameras
+from python.camera import Camera, check_camera_permission, list_cameras
 from python.detector import FaceDetector
 from python.blink_engine import BlinkEngine
 from python.preview import render_preview
@@ -89,10 +89,19 @@ class BlinkService:
         # Open the camera; emit an error and exit if it fails
         self._camera = Camera(index=camera_index)
         if not self._camera.open():
-            self._emit(make_error(
-                "CAMERA_OPEN_FAILED",
-                f"Could not open camera at index {camera_index}",
-            ))
+            # On macOS, check whether the failure was caused by permission denial
+            permission = check_camera_permission()
+            if permission == "denied":
+                self._emit(make_error(
+                    "CAMERA_PERMISSION_DENIED",
+                    "Camera access denied. Please grant permission in "
+                    "System Settings > Privacy & Security > Camera.",
+                ))
+            else:
+                self._emit(make_error(
+                    "CAMERA_OPEN_FAILED",
+                    f"Could not open camera at index {camera_index}",
+                ))
             self._camera = None
             return
 
@@ -105,7 +114,6 @@ class BlinkService:
         self._emit(make_status("running"))
 
         # Run the detection loop in a daemon thread so it doesn't block stdin reading. 
-        # daemon=True ensures it dies with the main thread.
         self._loop_thread = threading.Thread(target=self._detection_loop, daemon=True)
         self._loop_thread.start()
 
