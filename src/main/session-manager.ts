@@ -21,6 +21,7 @@ import type { ReminderState, TwentyTwentyState } from '../domain/types'
 import type { PythonCommand, PythonEvent } from '../shared/protocol'
 import { IPC_CHANNELS } from '../shared/ipc-messages'
 import type { SessionSummary, StateUpdate } from '../shared/ipc-messages'
+import { ReminderDispatcher, OverlayReminderStrategy } from './reminder-strategies'
 
 // ---------------------------------------------------------------------------
 // Dependencies interface (for testability)
@@ -49,6 +50,8 @@ export interface SessionManagerDeps {
   sendToRenderer: (channel: string, data: StateUpdate) => void
   // Minimum interval between state pushes in ms. Defaults to 100 (~10/s)
   throttleMs?: number
+  /** Reminder presentation dispatcher. Defaults to overlay-only if not provided. */
+  reminderDispatcher?: ReminderDispatcher
 }
 
 // ---------------------------------------------------------------------------
@@ -65,6 +68,7 @@ export class SessionManager {
   private bridge: BridgePort
   private sendToRenderer: (channel: string, data: StateUpdate) => void
   private throttleMs: number
+  private reminderDispatcher: ReminderDispatcher
 
   // -- Domain objects (re-created on each start()) --
   private blinkWindow = new BlinkWindow()
@@ -106,6 +110,7 @@ export class SessionManager {
     this.sendToRenderer = deps.sendToRenderer
     // Default 100ms throttle in production; tests pass 0 to disable
     this.throttleMs = deps.throttleMs ?? 100
+    this.reminderDispatcher = deps.reminderDispatcher ?? new ReminderDispatcher([new OverlayReminderStrategy()])
   }
 
   // -------------------------------------------------------------------------
@@ -124,6 +129,7 @@ export class SessionManager {
     this.twentyTwenty.stop()
 
     this.reminderState = 'idle'
+    this.reminderDispatcher.deactivate()
     this.faceDetected = false
     this.remindersTriggered = 0
     this.twentyTwentyBreaksTaken = 0
@@ -190,6 +196,7 @@ export class SessionManager {
     this.twentyTwenty.stop()
     this.lastTwentyTwentyState = { ...IDLE_TWENTY_TWENTY }
     this.reminderState = 'idle'
+    this.reminderDispatcher.deactivate()
 
     // Push final state, bypassing throttle (high-priority transition)
     this.pushStateUpdate()
@@ -270,6 +277,7 @@ export class SessionManager {
     )
 
     this.reminderState = result.state
+    this.reminderDispatcher.update(result.shouldShowReminder)
     if (result.shouldResetTimer) {
       this.blinkWindow.reset(timestamp)
     }
@@ -290,6 +298,7 @@ export class SessionManager {
     )
 
     this.reminderState = result.state
+    this.reminderDispatcher.update(result.shouldShowReminder)
     if (result.shouldResetTimer) {
       this.blinkWindow.reset(timestamp)
     }
@@ -317,6 +326,7 @@ export class SessionManager {
     }
 
     this.reminderState = result.state
+    this.reminderDispatcher.update(result.shouldShowReminder)
 
     // -- Evaluate 20-20-20 timer --
     // Store the new state in a temp variable first so we can compare
@@ -374,6 +384,7 @@ export class SessionManager {
     this.twentyTwenty.stop()
     this.lastTwentyTwentyState = { ...IDLE_TWENTY_TWENTY }
     this.reminderState = 'idle'
+    this.reminderDispatcher.deactivate()
   }
 
 
@@ -425,7 +436,7 @@ export class SessionManager {
       type: 'state_update',
       running: this.running,
       reminderState: this.reminderState,
-      shouldShowReminder: this.reminderState === 'overdue',
+      shouldShowReminder: this.reminderDispatcher.getStrategy<OverlayReminderStrategy>('overlay')?.active ?? false,
       blinksPerMinute: this.blinkStats.getBlinksPerMinute(now),
       totalBlinks: this.blinkStats.getTotalBlinks(),
       sessionDurationMs: this.sessionStartTime >= 0 ? now - this.sessionStartTime : 0,
