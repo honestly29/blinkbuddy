@@ -7,7 +7,9 @@
  * - Forward blink events from Python to domain layer
  * - Run 1-second interval for overdue checks and 20-20-20 timer
  * - Manage reminder state transitions
- * - Track session metrics for persistence (blink stats, break counts, etc.)
+ * - Handle Python error/status events for clean session lifecycle
+ * - Enforce startup timeout (10s) so the UI never hangs
+ * - Throttle state updates to ~10/s to prevent IPC flooding
  * - Push consolidated state to renderer via sendToRenderer callback
  */
 
@@ -45,13 +47,14 @@ export interface SessionConfig {
 export interface SessionManagerDeps {
   bridge: BridgePort
   sendToRenderer: (channel: string, data: StateUpdate) => void
+  // Minimum interval between state pushes in ms. Defaults to 100 (~10/s)
+  throttleMs?: number
 }
 
 // ---------------------------------------------------------------------------
 // Session Manager
 // ---------------------------------------------------------------------------
 
-/** Default 20-20-20 state used when the timer is idle or disabled. */
 const IDLE_TWENTY_TWENTY: TwentyTwentyState = {
   phase: 'idle',
   timeUntilBreakMs: 0,
@@ -61,6 +64,7 @@ const IDLE_TWENTY_TWENTY: TwentyTwentyState = {
 export class SessionManager {
   private bridge: BridgePort
   private sendToRenderer: (channel: string, data: StateUpdate) => void
+  private throttleMs: number
 
   // -- Domain objects (re-created on each start()) --
   private blinkWindow = new BlinkWindow()
@@ -76,6 +80,13 @@ export class SessionManager {
   private remindersTriggered = 0
   private lastTwentyTwentyState: TwentyTwentyState = { ...IDLE_TWENTY_TWENTY }
   private twentyTwentyBreaksTaken = 0
+
+  // Startup timeout handle. Fires after 10 seconds if Python hasn't
+  // confirmed "status: running".
+  private startupTimeout: ReturnType<typeof setTimeout> | null = null
+
+  private lastPushTime = 0
+  private pendingPush: ReturnType<typeof setTimeout> | null = null
 
   // -- Stable handler references for event subscription cleanup --
   //   1. `this` is always the SessionManager instance 
@@ -93,6 +104,8 @@ export class SessionManager {
   constructor(deps: SessionManagerDeps) {
     this.bridge = deps.bridge
     this.sendToRenderer = deps.sendToRenderer
+    // Default 100ms throttle in production; tests pass 0 to disable
+    this.throttleMs = deps.throttleMs ?? 100
   }
 
   // -------------------------------------------------------------------------
@@ -137,6 +150,13 @@ export class SessionManager {
       this.lastTwentyTwentyState = { ...IDLE_TWENTY_TWENTY }
     }
 
+    // Set a 10-second startup timeout. If Python doesn't emit
+    // "status: running" within this window, we assume it failed silently
+    this.startupTimeout = setTimeout(() => {
+      this.teardown()
+      this.sendStateNow('Could not start detection service')
+    }, 10_000)
+
     // Begin 1-second interval tick for overdue checks and 20-20-20 ticks
     this.tickInterval = setInterval(() => this.tick(), 1000)
 
@@ -149,13 +169,16 @@ export class SessionManager {
 
     this.running = false
 
-    // Clear the 1-second interval
+    // Clean up all timers: startup timeout, throttle pending push, tick interval
+    this.clearStartupTimeout()
+    this.cancelPendingPush()
+
     if (this.tickInterval) {
       clearInterval(this.tickInterval)
       this.tickInterval = null
     }
 
-    // Unsubscribe from bridge events to prevent handling events after stop
+    // Unsubscribe from bridge events 
     this.bridge.removeListener('event', this.onPythonEvent)
     this.bridge.removeListener('error', this.onPythonError)
     this.bridge.removeListener('exit', this.onPythonExit)
@@ -168,7 +191,7 @@ export class SessionManager {
     this.lastTwentyTwentyState = { ...IDLE_TWENTY_TWENTY }
     this.reminderState = 'idle'
 
-    // Push final state so the renderer shows "Stopped"
+    // Push final state, bypassing throttle (high-priority transition)
     this.pushStateUpdate()
   }
 
@@ -179,9 +202,8 @@ export class SessionManager {
    /**
    * Capture a snapshot of session metrics for persistence.
    *
-   * Called by the STOP IPC handler BEFORE stop() to get accurate metrics. Capturing before stop() ensures:
-   *   1. sessionEnd is the exact moment the user clicked stop
-   *   2. Domain objects haven't been reset yet
+   * Called by the STOP IPC handler BEFORE stop() to get accurate metrics. 
+   * Capturing before stop() ensures domain objects haven't been reset yet
    */
   getSessionSummary(): SessionSummary {
     const now = Date.now()
@@ -219,13 +241,24 @@ export class SessionManager {
       case 'tracking_status':
         this.handleTrackingStatus(event.face_detected, event.timestamp)
         break
-      // preview_frame, status, camera_list, error events are forwarded
-      // directly to the renderer by ipc-handlers — not handled here.
+      // Handle error events from Python 
+      case 'error':
+        this.teardown()
+        this.sendStateNow(event.message)
+        break
+      // Handle status events from Python. When Python confirms
+      // "status: running", clear the startup timeout
+      case 'status':
+        if (event.state === 'running') {
+          this.clearStartupTimeout()
+        }
+        break
+      // preview_frame and camera_list events are forwarded directly
+      // to the renderer by ipc-handlers. They don't affect session state.
     }
   }
 
   private handleBlink(timestamp: number): void {
-    // Record the blink in both domain objects
     this.blinkWindow.recordBlink(timestamp)
     this.blinkStats.recordBlink(timestamp)
 
@@ -270,14 +303,14 @@ export class SessionManager {
 
     const now = Date.now()
 
-    // -- Evaluate reminder state machine with a timer tick --
+    // Evaluate reminder state machine with a timer tick 
     const result = transition(
       this.reminderState,
       { type: 'timer_tick', timestamp: now },
       this.blinkWindow,
     )
 
-    // Detect new transitions to OVERDUE (blink window expired without a blink).
+    // Count new transitions to OVERDUE (blink window expired without a blink).
     // Only count transitions, not repeated overdue ticks.
     if (result.state === 'overdue' && this.reminderState !== 'overdue') {
       this.remindersTriggered++
@@ -318,27 +351,75 @@ export class SessionManager {
   // Internals
   // -------------------------------------------------------------------------
 
-  /** Emergency cleanup when the Python process crashes or exits unexpectedly. */
+   /** Emergency cleanup: stop everything without sending commands to Python.
+   *  Used when Python crashes, exits, or emits an error event. */
   private teardown(): void {
     this.running = false
+
+    // Clear all pending timers to prevent callbacks firing after teardown
+    this.clearStartupTimeout()
+    this.cancelPendingPush()
 
     if (this.tickInterval) {
       clearInterval(this.tickInterval)
       this.tickInterval = null
     }
 
+    // Unsubscribe from bridge events
     this.bridge.removeListener('event', this.onPythonEvent)
     this.bridge.removeListener('error', this.onPythonError)
     this.bridge.removeListener('exit', this.onPythonExit)
 
+    // Reset domain state
     this.twentyTwenty.stop()
     this.lastTwentyTwentyState = { ...IDLE_TWENTY_TWENTY }
     this.reminderState = 'idle'
   }
 
-  /** Build and send a consolidated state snapshot to the renderer. */
+
+  /**
+   * Rate-limits how often we send state updates to the UI (Trailing-edge throttling).
+   *
+   * Without this, rapid blink events could send 20+ updates per second, causing the UI to stutter. This limits it to ~10 per second (every 100ms).
+   *
+   * Three cases:
+   *   1. Error or stopped -> send immediately (user needs to see these right away)
+   *   2. 100ms+ since last send -> send immediately (enough time has passed)
+   *   3. Less than 100ms since last send -> wait, then send the latest state.
+   *      If more events arrive while waiting, they're included automatically
+   *      because the delayed send reads the current state when it fires.
+   */
   private pushStateUpdate(error?: string): void {
+    // Errors and stopped state bypass throttle entirely so users see errors instantly
+    if (error !== undefined || !this.running) {
+      this.cancelPendingPush()
+      this.sendStateNow(error)
+      return
+    }
+
     const now = Date.now()
+    const elapsed = now - this.lastPushTime
+
+    if (elapsed >= this.throttleMs) {
+      // Throttle window has passed, safe to send immediately
+      this.cancelPendingPush()
+      this.sendStateNow()
+    } else if (this.pendingPush === null) {
+      // Within throttle window and no trailing push scheduled yet.
+      // Schedule one for the remaining time in the window.
+      this.pendingPush = setTimeout(() => {
+        this.pendingPush = null
+        this.sendStateNow()
+      }, this.throttleMs - elapsed)
+    }
+    // If within throttle window AND a push is already pending, do nothing.
+    // The pending push will send the latest state when it fires.
+  }
+
+  /** Actually send a state update to the renderer via IPC. */
+  private sendStateNow(error?: string): void {
+    const now = Date.now()
+    this.lastPushTime = now  // Record when we last pushed for throttle timing
 
     const update: StateUpdate = {
       type: 'state_update',
@@ -359,13 +440,28 @@ export class SessionManager {
 
     this.sendToRenderer(IPC_CHANNELS.STATE_UPDATE, update)
   }
+
+  /** Clear the 10-second startup timeout (null-safe). */
+  private clearStartupTimeout(): void {
+    if (this.startupTimeout !== null) {
+      clearTimeout(this.startupTimeout)
+      this.startupTimeout = null
+    }
+  }
+
+  /** Cancel any pending throttled state push (null-safe). */
+  private cancelPendingPush(): void {
+    if (this.pendingPush !== null) {
+      clearTimeout(this.pendingPush)
+      this.pendingPush = null
+    }
+  }
 }
 
 /**
  * Population standard deviation of an array of numbers.
- *
- * Returns 0 if fewer than 2 values (need at least 2 inter-blink intervals for a meaningful deviation).
- * This avoids division-by-zero and produces a sensible result for very short sessions with 0 or 1 blinks.
+ * Returns 0 if fewer than 2 values (need at least 2 intervals
+ * for a meaningful deviation).
  */
 function computeStdDev(values: number[]): number {
   if (values.length < 2) return 0

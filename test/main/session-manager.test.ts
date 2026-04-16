@@ -66,6 +66,13 @@ function lastUpdate(sendToRenderer: ReturnType<typeof vi.fn>): StateUpdate {
   return calls[calls.length - 1][1] as StateUpdate
 }
 
+/** Start and confirm running (clears startup timeout). */
+function startWithConfirm(manager: SessionManager, config: SessionConfig, bridge: MockBridge): void {
+  manager.start(config)
+  // Simulate Python confirming successful startup
+  bridge.emit('event', { type: 'status', state: 'running' } as PythonEvent)
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -80,7 +87,7 @@ describe('SessionManager', () => {
     vi.setSystemTime(0)
     bridge = new MockBridge()
     sendToRenderer = vi.fn()
-    manager = new SessionManager({ bridge, sendToRenderer })
+    manager = new SessionManager({ bridge, sendToRenderer, throttleMs: 0 })
   })
 
   afterEach(() => {
@@ -245,7 +252,7 @@ describe('SessionManager', () => {
     })
 
     it('transitions OVERDUE → IDLE on blink', () => {
-      manager.start(DEFAULT_CONFIG)
+      startWithConfirm(manager, DEFAULT_CONFIG, bridge)
 
       // Advance past the 10-second window to become overdue
       vi.advanceTimersByTime(10_000)
@@ -278,7 +285,7 @@ describe('SessionManager', () => {
 
   describe('timer tick', () => {
     it('transitions IDLE → OVERDUE when blink window expires', () => {
-      manager.start(DEFAULT_CONFIG)
+      startWithConfirm(manager, DEFAULT_CONFIG, bridge)
 
       // Advance exactly to the window boundary (10 seconds)
       vi.advanceTimersByTime(10_000)
@@ -289,7 +296,7 @@ describe('SessionManager', () => {
     })
 
     it('stays IDLE before the window expires', () => {
-      manager.start(DEFAULT_CONFIG)
+      startWithConfirm(manager, DEFAULT_CONFIG, bridge)
 
       // Advance 9 seconds — not yet overdue
       vi.advanceTimersByTime(9000)
@@ -300,7 +307,7 @@ describe('SessionManager', () => {
     })
 
     it('increments remindersTriggered on transition to OVERDUE', () => {
-      manager.start(DEFAULT_CONFIG)
+      startWithConfirm(manager, DEFAULT_CONFIG, bridge)
 
       vi.advanceTimersByTime(10_000)
 
@@ -308,7 +315,7 @@ describe('SessionManager', () => {
     })
 
     it('does not double-count while staying OVERDUE', () => {
-      manager.start(DEFAULT_CONFIG)
+      startWithConfirm(manager, DEFAULT_CONFIG, bridge)
 
       // Become overdue, then stay overdue for several more ticks
       vi.advanceTimersByTime(13_000)
@@ -317,7 +324,7 @@ describe('SessionManager', () => {
     })
 
     it('counts multiple overdue episodes', () => {
-      manager.start(DEFAULT_CONFIG)
+      startWithConfirm(manager, DEFAULT_CONFIG, bridge)
 
       // First overdue
       vi.advanceTimersByTime(10_000)
@@ -377,7 +384,7 @@ describe('SessionManager', () => {
     })
 
     it('resets blink timer when face is restored', () => {
-      manager.start(DEFAULT_CONFIG)
+      startWithConfirm(manager, DEFAULT_CONFIG, bridge)
 
       // Advance 8 seconds (close to overdue, but not yet)
       vi.advanceTimersByTime(8000)
@@ -403,7 +410,7 @@ describe('SessionManager', () => {
     })
 
     it('suppresses overdue reminder when face is lost', () => {
-      manager.start(DEFAULT_CONFIG)
+      startWithConfirm(manager, DEFAULT_CONFIG, bridge)
 
       // Become overdue
       vi.advanceTimersByTime(10_000)
@@ -524,7 +531,7 @@ describe('SessionManager', () => {
     })
 
     it('transitions to break after 20 minutes', () => {
-      manager.start({ ...DEFAULT_CONFIG, twentyTwentyEnabled: true })
+      startWithConfirm(manager, { ...DEFAULT_CONFIG, twentyTwentyEnabled: true }, bridge)
 
       // Advance 20 minutes
       vi.advanceTimersByTime(20 * 60 * 1000)
@@ -549,7 +556,7 @@ describe('SessionManager', () => {
 
   describe('session summary', () => {
     it('returns correct summary data', () => {
-      manager.start(DEFAULT_CONFIG)
+      startWithConfirm(manager, DEFAULT_CONFIG, bridge)
 
       // Record some blinks with 1-second intervals
       bridge.emit('event', blinkEvent(1000))
@@ -591,7 +598,7 @@ describe('SessionManager', () => {
 
   describe('full cycle: idle → overdue → idle (on blink)', () => {
     it('completes the idle → overdue → idle cycle', () => {
-      manager.start(DEFAULT_CONFIG) // T = 10s
+      startWithConfirm(manager, DEFAULT_CONFIG, bridge)
 
       // Initially idle
       expect(lastUpdate(sendToRenderer).reminderState).toBe('idle')
@@ -616,7 +623,7 @@ describe('SessionManager', () => {
 
   describe('full cycle: idle → suppressed → idle with timer reset', () => {
     it('completes the idle → suppressed → idle cycle', () => {
-      manager.start(DEFAULT_CONFIG) // T = 10s
+      startWithConfirm(manager, DEFAULT_CONFIG, bridge)
 
       // Wait 5 seconds
       vi.advanceTimersByTime(5000)
@@ -638,6 +645,179 @@ describe('SessionManager', () => {
       // Now wait full window from reset point → overdue
       vi.advanceTimersByTime(10_000)
       expect(lastUpdate(sendToRenderer).reminderState).toBe('overdue')
+    })
+  })
+
+    // -----------------------------------------------------------------------
+  // Startup timeout
+  // -----------------------------------------------------------------------
+  describe('startup timeout', () => {
+    it('fires error after 10s with no status:running confirmation', () => {
+      // Use start() (NOT startWithConfirm) to leave the timeout active
+      manager.start(DEFAULT_CONFIG)
+
+      vi.advanceTimersByTime(10_000)
+
+      expect(manager.isRunning()).toBe(false)
+      const update = lastUpdate(sendToRenderer)
+      expect(update.running).toBe(false)
+      expect(update.error).toBe('Could not start detection service')
+    })
+
+    it('clears on status:running confirmation', () => {
+      // Confirm startup, which clears the timeout
+      startWithConfirm(manager, DEFAULT_CONFIG, bridge)
+
+      // Advance past 10s — should NOT trigger timeout
+      vi.advanceTimersByTime(9000)
+
+      expect(manager.isRunning()).toBe(true)
+      expect(lastUpdate(sendToRenderer).error).toBeUndefined()
+    })
+
+    it('clears on manual stop before timeout fires', () => {
+      manager.start(DEFAULT_CONFIG)
+      manager.stop()  // User stops before Python confirms
+      sendToRenderer.mockClear()
+
+      // Advance past 10s — should NOT trigger timeout
+      vi.advanceTimersByTime(10_000)
+
+      // No extra state pushes (timeout was cleared by stop())
+      expect(sendToRenderer).not.toHaveBeenCalled()
+    })
+
+    it('clears on Python error event before timeout fires', () => {
+      manager.start(DEFAULT_CONFIG)
+
+      // Python emits a camera error (which calls teardown, clearing the timeout)
+      bridge.emit('event', { type: 'error', code: 'CAMERA_OPEN_FAILED', message: 'No camera' } as PythonEvent)
+
+      // The error event should have torn down and cleared timeout
+      sendToRenderer.mockClear()
+      vi.advanceTimersByTime(10_000)
+
+      // No extra error from the timeout firing
+      expect(sendToRenderer).not.toHaveBeenCalled()
+    })
+  })
+
+  // -----------------------------------------------------------------------
+  // Python error event handling
+  // -----------------------------------------------------------------------
+
+  describe('Python error event handling', () => {
+    it('stops session and shows error message on Python error event', () => {
+      manager.start(DEFAULT_CONFIG)
+      sendToRenderer.mockClear()
+
+      // Simulate Python emitting a camera error
+      bridge.emit('event', { type: 'error', code: 'CAMERA_OPEN_FAILED', message: 'Could not open camera at index 0' } as PythonEvent)
+
+      // Session should be torn down with the error message from Python
+      expect(manager.isRunning()).toBe(false)
+      const update = lastUpdate(sendToRenderer)
+      expect(update.running).toBe(false)
+      expect(update.error).toBe('Could not open camera at index 0')
+    })
+
+    it('stops session on permission denied error', () => {
+      manager.start(DEFAULT_CONFIG)
+      sendToRenderer.mockClear()
+
+      // Simulate the macOS-specific permission denied error
+      bridge.emit('event', {
+        type: 'error',
+        code: 'CAMERA_PERMISSION_DENIED',
+        message: 'Camera access denied. Please grant permission in System Settings > Privacy & Security > Camera.',
+      } as PythonEvent)
+
+      expect(manager.isRunning()).toBe(false)
+      const update = lastUpdate(sendToRenderer)
+      expect(update.error).toContain('Camera access denied')
+    })
+
+    it('clears tick interval on Python error event', () => {
+      manager.start(DEFAULT_CONFIG)
+      // Error tears down the session (including clearing the tick interval)
+      bridge.emit('event', { type: 'error', code: 'FAIL', message: 'Boom' } as PythonEvent)
+      sendToRenderer.mockClear()
+
+      // Advance time - no tick callbacks should fire (interval was cleared)
+      vi.advanceTimersByTime(5000)
+
+      expect(sendToRenderer).not.toHaveBeenCalled()
+    })
+  })
+
+  // -----------------------------------------------------------------------
+  // Throttle
+  // -----------------------------------------------------------------------
+
+  describe('state update throttle', () => {
+    let throttledManager: SessionManager
+
+    beforeEach(() => {
+      throttledManager = new SessionManager({ bridge, sendToRenderer, throttleMs: 100 })
+    })
+
+    afterEach(() => {
+      if (throttledManager.isRunning()) {
+        throttledManager.stop()
+      }
+    })
+
+    it('throttles rapid blink events within 100ms', () => {
+      startWithConfirm(throttledManager, DEFAULT_CONFIG, bridge)
+      // Advance past throttle window so first blink sends immediately
+      vi.advanceTimersByTime(100)
+      sendToRenderer.mockClear()
+
+      // Send 5 blink events in rapid succession (all at same fake time)
+      for (let i = 0; i < 5; i++) {
+        bridge.emit('event', blinkEvent(1100 + i))
+      }
+
+      // First blink sends immediately (100ms since last push).
+      // Remaining 4 are within the throttle window: only 1 trailing push scheduled.
+      // So total is at most 2 (1 immediate + 1 pending).
+      const callCount = sendToRenderer.mock.calls.length
+      expect(callCount).toBeLessThanOrEqual(2)
+    })
+
+    it('pending push fires after delay', () => {
+      startWithConfirm(throttledManager, DEFAULT_CONFIG, bridge)
+      // Advance past throttle window twice to clear initial state
+      vi.advanceTimersByTime(200)
+      sendToRenderer.mockClear()
+
+      // First blink: immediate (100ms+ since last push)
+      bridge.emit('event', blinkEvent(1000))
+      const afterFirst = sendToRenderer.mock.calls.length
+      expect(afterFirst).toBe(1)
+
+      // Second blink: within 100ms window, should be throttled (pending)
+      bridge.emit('event', blinkEvent(1001))
+      const afterSecond = sendToRenderer.mock.calls.length
+      expect(afterSecond).toBe(1) // Still 1 - second blink is pending
+
+      // Advance 100ms - the trailing push fires with the latest state
+      vi.advanceTimersByTime(100)
+      expect(sendToRenderer.mock.calls.length).toBe(2)
+    })
+
+    it('errors bypass throttle', () => {
+      startWithConfirm(throttledManager, DEFAULT_CONFIG, bridge)
+
+      // Send a blink to set lastPushTime (starts the throttle window)
+      bridge.emit('event', blinkEvent(1000))
+      sendToRenderer.mockClear()
+
+      // Error should send immediately even though within 100ms
+      bridge.emit('event', { type: 'error', code: 'FAIL', message: 'Error!' } as PythonEvent)
+
+      expect(sendToRenderer.mock.calls.length).toBe(1)
+      expect(lastUpdate(sendToRenderer).error).toBe('Error!')
     })
   })
 })
