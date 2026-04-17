@@ -9,37 +9,54 @@ import cv2
 def check_camera_permission():
     """Check whether camera access is likely denied by the OS.
 
-    On macOS: if system_profiler reports camera hardware
-    (Model ID present) but cv2.VideoCapture failed to open, it's likely a settings permission issue.
+    Uses a two-step check on macOS:
+    1. Verify camera hardware exists (system_profiler).
+    2. Query actual authorisation status (AVFoundation via swift CLI).
 
     Returns:
-        'denied' if camera hardware exists but access appears blocked,
-        'unknown' otherwise (non-macOS, no hardware, or detection failed).
+        'denied' if macOS camera authorisation is denied or restricted,
+        'unknown' otherwise (not a permission issue, or status unclear).
     """
-    # This check only works for macOS. On Linux or Windows fall back to "unknown"
     if platform.system() != "Darwin":
         return "unknown"
 
+    # Step 1: Verify camera hardware exists
     try:
-        # system_profiler is a built-in macOS utility that lists hardware details. 
-        # SPCameraDataType lists connected cameras regardless of whether the app has permission to use them.
         result = subprocess.run(
             ["system_profiler", "SPCameraDataType"],
             capture_output=True,
             text=True,
-            timeout=5,  # Prevent blocking if system_profiler hangs
+            timeout=5,
         )
-        # If the output contains "Model ID", a physical camera is connected.
-        # But cv2.VideoCapture failed to open, so there is likely
-        # a permissions issue
-        if "Model ID" in result.stdout:
+        if "Model ID" not in result.stdout:
+            # No camera hardware found - not a permission issue
+            return "unknown"
+    except (subprocess.TimeoutExpired, OSError):
+        return "unknown"
+
+    # Step 2: Check actual macOS camera authorisation status
+    # Uses the swift CLI to query AVFoundation directly
+    try:
+        auth = subprocess.run(
+            [
+                "swift", "-e",
+                "import AVFoundation; "
+                "print(AVCaptureDevice.authorizationStatus(for: .video).rawValue)",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        status = auth.stdout.strip()
+        # AVAuthorizationStatus: 0=notDetermined, 1=restricted, 2=denied, 3=authorised
+        # Only 1 and 2 are permission problems.
+        if status in ("1", "2"):
             return "denied"
     except (subprocess.TimeoutExpired, OSError):
-        # TimeoutExpired: system_profiler took too long 
-        # OSError: system_profiler not found (shouldn't happen on macOS)
-        # In both cases, fall through to return "unknown"
         pass
 
+    # Camera hardware exists but permission status is either authorised (3),
+    # not yet determined (0), or we couldn't check.
     return "unknown"
 
 
