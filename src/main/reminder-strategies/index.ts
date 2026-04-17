@@ -3,4 +3,5 @@
 // of reaching into individual files.
 export { ReminderDispatcher } from './reminder-dispatcher'
 export { OverlayReminderStrategy } from './overlay-strategy'
+export { ScreenEdgeGlowStrategy } from './screen-edge-glow-strategy'
 export type { ReminderStrategy } from './types'
