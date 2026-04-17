@@ -28,14 +28,28 @@ export function useSettings() {
   // Starts true because the fetch begins immediately on mount.
   const [camerasLoading, setCamerasLoading] = useState(true)
 
-  // Load persisted settings and enumerate cameras on mount.
+  // Load both settings and cameras together, then validate.
   useEffect(() => {
-    window.blinkBuddy.loadSettings().then(setSettings)
-    window.blinkBuddy
-      .listCameras()
-      .then(setCameras)
-      .finally(() => setCamerasLoading(false))  // Clear loading flag even if the call fails
-  }, [])
+  Promise.all([
+    window.blinkBuddy.loadSettings(),
+    window.blinkBuddy.listCameras(),
+  ]).then(([loadedSettings, loadedCameras]) => {
+    setCameras(loadedCameras)
+
+    // Check if the saved camera index still exists in the available cameras.
+    // This handles the case where an external webcam was disconnected since
+    // the last session, leaving a stale index (e.g. 1) in settings.json.
+    const validIndex = loadedCameras.some(c => c.index === loadedSettings.cameraIndex)
+    if (!validIndex && loadedCameras.length > 0) {
+      // Stale index: correct to the first available camera and persist the correction 
+      const corrected = { ...loadedSettings, cameraIndex: loadedCameras[0].index }
+      window.blinkBuddy.saveSettings(corrected)
+      setSettings(corrected)
+    } else {
+      setSettings(loadedSettings)
+    }
+  }).finally(() => setCamerasLoading(false))
+}, [])
 
   const setBlinkWindow = useCallback((seconds: number) => {
     setSettings(prev => {
