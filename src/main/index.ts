@@ -5,7 +5,13 @@ import { SessionManager } from './session-manager'
 import { registerIpcHandlers } from './ipc-handlers'
 import { SettingsStore } from './settings-store'
 import { SessionLogger } from './session-logger'
-import { ReminderDispatcher, OverlayReminderStrategy, ScreenEdgeGlowStrategy } from './reminder-strategies'
+import {
+  ReminderDispatcher,
+  OverlayReminderStrategy,
+  ScreenEdgeGlowStrategy,
+  CornerPopupStrategy,      
+  AudioCueStrategy,         
+} from './reminder-strategies'
 
 let mainWindow: BrowserWindow | null = null
 let pythonBridge: PythonBridge | null = null
@@ -47,6 +53,8 @@ app.whenReady().then(() => {
   reminderDispatcher = new ReminderDispatcher([
     new OverlayReminderStrategy(),
     new ScreenEdgeGlowStrategy(),
+    new CornerPopupStrategy(),   
+    new AudioCueStrategy(), 
   ])
 
   // Create session manager

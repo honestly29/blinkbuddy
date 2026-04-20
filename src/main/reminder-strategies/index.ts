@@ -4,4 +4,6 @@
 export { ReminderDispatcher } from './reminder-dispatcher'
 export { OverlayReminderStrategy } from './overlay-strategy'
 export { ScreenEdgeGlowStrategy } from './screen-edge-glow-strategy'
+export { CornerPopupStrategy } from './corner-popup-strategy'
+export { AudioCueStrategy } from './audio-cue-strategy'
 export type { ReminderStrategy } from './types'
