@@ -8,10 +8,10 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { IPC_CHANNELS, type BlinkBuddyAPI, type StateUpdate } from '../shared/ipc-messages'
 import type { PythonEvent } from '../shared/protocol'
 
+// Concrete implementation of the BlinkBuddyAPI interface. Each method
+// wraps an ipcRenderer call, so the renderer never touches Electron's
+// APIs directly, only this object.
 const api: BlinkBuddyAPI = {
-  // --- Command methods (request/response) ---
-  // These use ipcRenderer.invoke(), which sends a message to the main process
-  // and returns a Promise that resolves with the main process's reply.
   start: (args) => ipcRenderer.invoke(IPC_CHANNELS.START, args),
   stop: () => ipcRenderer.invoke(IPC_CHANNELS.STOP),
   setPreview: (args) => ipcRenderer.invoke(IPC_CHANNELS.SET_PREVIEW, args),
@@ -19,7 +19,9 @@ const api: BlinkBuddyAPI = {
   getSessionHistory: () => ipcRenderer.invoke(IPC_CHANNELS.GET_SESSION_HISTORY),
   saveSettings: (settings) => ipcRenderer.invoke(IPC_CHANNELS.SAVE_SETTINGS, settings),
   loadSettings: () => ipcRenderer.invoke(IPC_CHANNELS.LOAD_SETTINGS),
-
+  getReminderPreferences: () => ipcRenderer.invoke(IPC_CHANNELS.GET_REMINDER_PREFERENCES),
+  updateReminderPreferences: (prefs) => ipcRenderer.invoke(IPC_CHANNELS.UPDATE_REMINDER_PREFERENCES, prefs),
+  testReminder: (strategyId) => ipcRenderer.invoke(IPC_CHANNELS.TEST_REMINDER, strategyId),
 
   // --- Event subscription methods ---
   // These use ipcRenderer.on() to listen for events pushed from the main process.
@@ -29,7 +31,6 @@ const api: BlinkBuddyAPI = {
       callback(pythonEvent)
     }
     ipcRenderer.on(IPC_CHANNELS.PYTHON_EVENT, handler)
-    // Return unsubscribe function
     return () => {
       ipcRenderer.removeListener(IPC_CHANNELS.PYTHON_EVENT, handler)
     }

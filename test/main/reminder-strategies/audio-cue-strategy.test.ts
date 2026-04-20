@@ -174,4 +174,66 @@ describe('AudioCueStrategy', () => {
     expect(html).toContain('data:audio/mpeg;base64,')
     expect(html).toContain('function play()')
   })
+
+  it('sets volume on audio element at creation time, not just in play()', () => {
+    strategy.configure({ volume: 0.8 })
+    strategy.onReminderStart()
+
+    const url = mockWin.loadURL.mock.calls[0][0] as string
+    const html = decodeURIComponent(url)
+    // Volume should be set on the element outside of play()
+    expect(html).toMatch(/getElementById\('cue'\)\.volume = 0\.8/)
+  })
+
+  // -------------------------------------------------------------------------
+  // configure()
+  // -------------------------------------------------------------------------
+
+  it('configure with new soundFile disposes existing window', () => {
+    strategy.onReminderStart()
+    strategy.configure({ soundFile: 'universfield-clear-bell-chime.mp3' })
+
+    expect(mockWin.close).toHaveBeenCalledTimes(1)
+  })
+
+  it('configure with same soundFile does not dispose window', () => {
+    strategy.onReminderStart()
+    strategy.configure({ soundFile: 'dragon-studio-ding.mp3' })
+
+    expect(mockWin.close).not.toHaveBeenCalled()
+  })
+
+  it('configure volume updates existing window via executeJavaScript', () => {
+    strategy.onReminderStart()
+    mockWin._simulateLoad()
+
+    strategy.configure({ volume: 0.3 })
+
+    expect(mockWin.webContents.executeJavaScript).toHaveBeenCalledWith(
+      "document.getElementById('cue').volume = 0.3",
+    )
+  })
+
+  it('configure with no window does not throw', () => {
+    expect(() => strategy.configure({ volume: 0.5 })).not.toThrow()
+  })
+
+  it('configure ignores invalid soundFile', () => {
+    strategy.onReminderStart()
+    strategy.configure({ soundFile: 'invalid.mp3' })
+
+    expect(mockWin.close).not.toHaveBeenCalled()
+  })
+
+  it('configure ignores out-of-range volume', () => {
+    strategy.onReminderStart()
+    mockWin._simulateLoad()
+
+    strategy.configure({ volume: 1.5 })
+
+    // Should not call executeJavaScript for volume update
+    expect(mockWin.webContents.executeJavaScript).not.toHaveBeenCalledWith(
+      expect.stringContaining('volume'),
+    )
+  })
 })

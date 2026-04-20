@@ -21,9 +21,26 @@ export const IPC_CHANNELS = {
   GET_SESSION_HISTORY: 'blink:get-session-history',
   SAVE_SETTINGS: 'blink:save-settings',
   LOAD_SETTINGS: 'blink:load-settings',
+  GET_REMINDER_PREFERENCES: 'blink:get-reminder-preferences',
+  UPDATE_REMINDER_PREFERENCES: 'blink:update-reminder-preferences',
+  TEST_REMINDER: 'blink:test-reminder',
   PYTHON_EVENT: 'blink:python-event',
   STATE_UPDATE: 'blink:state-update',
 } as const  
+
+// ---------------------------------------------------------------------------
+// Reminder preferences types
+// ---------------------------------------------------------------------------
+
+// The four valid corner positions for the popup window.
+export type CornerPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+
+export interface ReminderPreferences {
+  overlay: { enabled: boolean }
+  screenEdgeGlow: { enabled: boolean; colour: string; opacity: number }
+  cornerPopup: { enabled: boolean; corner: CornerPosition }
+  audioCue: { enabled: boolean; soundFile: string; volume: number }
+}
 
 // ---------------------------------------------------------------------------
 // Channel argument/return types
@@ -95,7 +112,9 @@ export interface BlinkBuddyAPI {
   getSessionHistory: () => Promise<SessionSummary[]>
   saveSettings: (settings: UserSettings) => Promise<void>
   loadSettings: () => Promise<UserSettings>
-
+  getReminderPreferences: () => Promise<ReminderPreferences>
+  updateReminderPreferences: (prefs: ReminderPreferences) => Promise<void>
+  testReminder: (strategyId: string) => Promise<void>
   // Event subscription methods (push-based via ipcRenderer.on)
   onPythonEvent: (callback: (event: PythonEvent) => void) => () => void
   onStateUpdate: (callback: (state: StateUpdate) => void) => () => void

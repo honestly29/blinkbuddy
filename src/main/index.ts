@@ -4,14 +4,10 @@ import { PythonBridge } from './python-bridge'
 import { SessionManager } from './session-manager'
 import { registerIpcHandlers } from './ipc-handlers'
 import { SettingsStore } from './settings-store'
+import { ReminderPreferencesStore } from './reminder-preferences-store'
 import { SessionLogger } from './session-logger'
-import {
-  ReminderDispatcher,
-  OverlayReminderStrategy,
-  ScreenEdgeGlowStrategy,
-  CornerPopupStrategy,      
-  AudioCueStrategy,         
-} from './reminder-strategies'
+import { ReminderDispatcher, OverlayReminderStrategy, ScreenEdgeGlowStrategy, CornerPopupStrategy, AudioCueStrategy } from './reminder-strategies'
+import type { ReminderStrategy } from './reminder-strategies/types'
 
 let mainWindow: BrowserWindow | null = null
 let pythonBridge: PythonBridge | null = null
@@ -30,13 +26,13 @@ function createWindow() {
     },
   })
 
-  // When the main window is closed, trigger app quit.
-  // This stops the glow window from keeping Electron alive
   mainWindow.on('closed', () => {
     mainWindow = null
     app.quit()
   })
 
+  // In development Vite serves the renderer over HTTP with hot reload,
+  // in production we load the bundled static HTML from disk instead.
   if (process.env.VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL)
   } else {
@@ -49,13 +45,39 @@ app.whenReady().then(() => {
   pythonBridge = new PythonBridge()
   pythonBridge.spawn()
 
+  // -- Load reminder preferences and build the strategy list --
+  const reminderPreferencesStore = new ReminderPreferencesStore(app.getPath('userData'))
+  const prefs = reminderPreferencesStore.load()
+
+  const strategies: ReminderStrategy[] = []
+
+  if (prefs.overlay.enabled) {
+    strategies.push(new OverlayReminderStrategy())
+  }
+
+  if (prefs.screenEdgeGlow.enabled) {
+    const s = new ScreenEdgeGlowStrategy()
+    // Configure before adding, so the strategy has its saved 
+    // settings applied before the dispatcher can call
+    // onReminderStart on it.
+    s.configure({ colour: prefs.screenEdgeGlow.colour, opacity: prefs.screenEdgeGlow.opacity })
+    strategies.push(s)
+  }
+
+  if (prefs.cornerPopup.enabled) {
+    const s = new CornerPopupStrategy()
+    s.configure({ corner: prefs.cornerPopup.corner })
+    strategies.push(s)
+  }
+
+  if (prefs.audioCue.enabled) {
+    const s = new AudioCueStrategy()
+    s.configure({ soundFile: prefs.audioCue.soundFile, volume: prefs.audioCue.volume })
+    strategies.push(s)
+  }
+
   // Create reminder dispatcher with strategies
-  reminderDispatcher = new ReminderDispatcher([
-    new OverlayReminderStrategy(),
-    new ScreenEdgeGlowStrategy(),
-    new CornerPopupStrategy(),   
-    new AudioCueStrategy(), 
-  ])
+  reminderDispatcher = new ReminderDispatcher(strategies)
 
   // Create session manager
   sessionManager = new SessionManager({
@@ -73,7 +95,7 @@ app.whenReady().then(() => {
   sessionLogger = new SessionLogger(app.getPath('userData'))
 
   // Register IPC handlers before creating the window
-  registerIpcHandlers(pythonBridge, sessionManager, () => mainWindow, settingsStore, sessionLogger)
+  registerIpcHandlers(pythonBridge, sessionManager, () => mainWindow, settingsStore, sessionLogger, reminderPreferencesStore, reminderDispatcher)
 
   createWindow()
 })

@@ -44,4 +44,10 @@ describe('OverlayReminderStrategy', () => {
     strategy.onReminderStart()
     expect(strategy.active).toBe(true)
   })
+
+  it('configure is a no-op', () => {
+    const strategy = new OverlayReminderStrategy()
+    expect(() => strategy.configure({ anything: 'ignored' })).not.toThrow()
+    expect(strategy.active).toBe(false)
+  })
 })

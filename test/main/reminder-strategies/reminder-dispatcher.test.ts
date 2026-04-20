@@ -5,12 +5,14 @@ import type { ReminderStrategy } from '../../../src/main/reminder-strategies/typ
 function mockStrategy(id: string): ReminderStrategy & {
   onReminderStart: ReturnType<typeof vi.fn>
   onReminderEnd: ReturnType<typeof vi.fn>
+  configure: ReturnType<typeof vi.fn>
   dispose: ReturnType<typeof vi.fn>
 } {
   return {
     id,
     onReminderStart: vi.fn(),
     onReminderEnd: vi.fn(),
+    configure: vi.fn(),
     dispose: vi.fn(),
   }
 }
@@ -135,10 +137,127 @@ describe('ReminderDispatcher', () => {
     expect(dispatcher.getStrategy('unknown')).toBeUndefined()
   })
 
-  // -- Edge case --
+  // -------------------------------------------------------------------------
+  // isActive
+  // -------------------------------------------------------------------------
+
+  it('isActive is false initially', () => {
+    expect(dispatcher.isActive).toBe(false)
+  })
+
+  it('isActive is true after update(true)', () => {
+    dispatcher.update(true)
+    expect(dispatcher.isActive).toBe(true)
+  })
+
+  it('isActive is false after update(false)', () => {
+    dispatcher.update(true)
+    dispatcher.update(false)
+    expect(dispatcher.isActive).toBe(false)
+  })
+
+  // -------------------------------------------------------------------------
+  // strategyCount
+  // -------------------------------------------------------------------------
+
+  it('strategyCount reflects constructor strategies', () => {
+    expect(dispatcher.strategyCount).toBe(2)
+  })
+
+  it('strategyCount is 0 for empty dispatcher', () => {
+    expect(new ReminderDispatcher([]).strategyCount).toBe(0)
+  })
+
+  // -------------------------------------------------------------------------
+  // addStrategy()
+  // -------------------------------------------------------------------------
+
+  it('addStrategy registers a new strategy', () => {
+    const strategyC = mockStrategy('c')
+    dispatcher.addStrategy(strategyC)
+
+    expect(dispatcher.strategyCount).toBe(3)
+    expect(dispatcher.getStrategy('c')).toBe(strategyC)
+  })
+
+  it('addStrategy calls onReminderStart immediately when dispatcher is active', () => {
+    dispatcher.update(true)
+
+    const strategyC = mockStrategy('c')
+    dispatcher.addStrategy(strategyC)
+
+    expect(strategyC.onReminderStart).toHaveBeenCalledTimes(1)
+  })
+
+  it('addStrategy does not call onReminderStart when dispatcher is inactive', () => {
+    const strategyC = mockStrategy('c')
+    dispatcher.addStrategy(strategyC)
+
+    expect(strategyC.onReminderStart).not.toHaveBeenCalled()
+  })
+
+  it('added strategy receives future update events', () => {
+    const strategyC = mockStrategy('c')
+    dispatcher.addStrategy(strategyC)
+
+    dispatcher.update(true)
+
+    expect(strategyC.onReminderStart).toHaveBeenCalledTimes(1)
+  })
+
+  // -------------------------------------------------------------------------
+  // removeStrategy()
+  // -------------------------------------------------------------------------
+
+  it('removeStrategy unregisters and disposes a strategy', () => {
+    const result = dispatcher.removeStrategy('a')
+
+    expect(result).toBe(true)
+    expect(dispatcher.strategyCount).toBe(1)
+    expect(dispatcher.getStrategy('a')).toBeUndefined()
+    expect(strategyA.dispose).toHaveBeenCalledTimes(1)
+  })
+
+  it('removeStrategy calls onReminderEnd before dispose when active', () => {
+    dispatcher.update(true)
+    strategyA.onReminderEnd.mockClear()
+
+    dispatcher.removeStrategy('a')
+
+    expect(strategyA.onReminderEnd).toHaveBeenCalledTimes(1)
+    expect(strategyA.dispose).toHaveBeenCalledTimes(1)
+    // Verify order: end before dispose
+    const endOrder = strategyA.onReminderEnd.mock.invocationCallOrder[0]
+    const disposeOrder = strategyA.dispose.mock.invocationCallOrder[0]
+    expect(endOrder).toBeLessThan(disposeOrder)
+  })
+
+  it('removeStrategy does not call onReminderEnd when inactive', () => {
+    dispatcher.removeStrategy('a')
+
+    expect(strategyA.onReminderEnd).not.toHaveBeenCalled()
+    expect(strategyA.dispose).toHaveBeenCalledTimes(1)
+  })
+
+  it('removeStrategy returns false for unknown id', () => {
+    expect(dispatcher.removeStrategy('unknown')).toBe(false)
+  })
+
+  it('removed strategy no longer receives update events', () => {
+    dispatcher.removeStrategy('a')
+    strategyA.onReminderStart.mockClear()
+
+    dispatcher.update(true)
+
+    expect(strategyA.onReminderStart).not.toHaveBeenCalled()
+    expect(strategyB.onReminderStart).toHaveBeenCalledTimes(1)
+  })
+
+  // -------------------------------------------------------------------------
+  // Empty strategies
+  // -------------------------------------------------------------------------
 
   it('handles empty strategies array without errors', () => {
-    // A dispatcher with no strategies should not crash on any operation
     const empty = new ReminderDispatcher([])
     expect(() => {
       empty.update(true)

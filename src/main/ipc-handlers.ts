@@ -8,19 +8,80 @@
 
 import { ipcMain, type BrowserWindow } from 'electron'
 import { IPC_CHANNELS } from '../shared/ipc-messages'
-import type { StartArgs, SetPreviewArgs, UserSettings, SessionSummary } from '../shared/ipc-messages'
+import type { StartArgs, SetPreviewArgs, UserSettings, SessionSummary, ReminderPreferences, StateUpdate } from '../shared/ipc-messages'
 import type { PythonBridge } from './python-bridge'
 import type { SessionManager } from './session-manager'
 import type { SettingsStore } from './settings-store'
 import type { SessionLogger } from './session-logger'
+import type { ReminderPreferencesStore } from './reminder-preferences-store'
 import type { CameraInfo } from '../shared/protocol'
+import type { ReminderStrategy } from './reminder-strategies/types'
+import { ReminderDispatcher, OverlayReminderStrategy, ScreenEdgeGlowStrategy, CornerPopupStrategy, AudioCueStrategy } from './reminder-strategies'
+
+// Maps each strategy id to a function that constructs a fresh instance of that strategy. 
+// Used when we need to create a strategy from just its id:
+// either to register one that the user has just enabled, or to build an instance for the Test Reminder feature.
+const STRATEGY_FACTORIES: Record<string, () => ReminderStrategy> = {
+  'overlay': () => new OverlayReminderStrategy(),
+  'screen-edge-glow': () => new ScreenEdgeGlowStrategy(),
+  'corner-popup': () => new CornerPopupStrategy(),
+  'audio-cue': () => new AudioCueStrategy(),
+}
+
+// Returns only the settings relevant to a given strategy from the full ReminderPreferences object.
+// The returned object is what gets handed to strategy.configure().
+function getStrategyConfig(prefs: ReminderPreferences, id: string): Record<string, unknown> {
+  switch (id) {
+    case 'overlay': return {}
+    case 'screen-edge-glow': return { colour: prefs.screenEdgeGlow.colour, opacity: prefs.screenEdgeGlow.opacity }
+    case 'corner-popup': return { corner: prefs.cornerPopup.corner }
+    case 'audio-cue': return { soundFile: prefs.audioCue.soundFile, volume: prefs.audioCue.volume }
+    default: return {}
+  }
+}
+
+/**
+ * Applies a single strategy's enabled flag and configuration to the live dispatcher.
+ * There are four cases, handled uniformly here:
+ *   1. Enabled + already registered: update the existing instance.
+ *   2. Enabled + not registered: create it, configure it, register it.
+ *   3. Disabled + registered: remove and dispose it.
+ *   4. Disabled + not registered: nothing to do.
+ */
+function applyStrategyPreference(
+  dispatcher: ReminderDispatcher,
+  id: string,
+  enabled: boolean,
+  factory: () => ReminderStrategy,
+  config: Record<string, unknown>,
+): void {
+  const existing = dispatcher.getStrategy(id)
+
+  if (enabled) {
+    if (existing) {
+      // Case 1: already running, just apply the new configuration to it.
+      existing.configure(config)
+    } else {
+      // Case 2: create a new instance and configure it *before* adding it to the dispatcher. 
+      const strategy = factory()
+      strategy.configure(config)
+      dispatcher.addStrategy(strategy)
+    }
+  } else {
+    if (existing) {
+      // Case 3: remove and dispose. 
+      dispatcher.removeStrategy(id)
+    }
+    // Case 4: no-op (already disabled and not registered).
+  }
+}
+
+
+
 
 
 /** 
  * Register all IPC handlers. Call once after creating all dependencies.
- * 
- * Accepts five injected dependencies (bridge, sessionManager,
- * getMainWindow, settingsStore, sessionLogger).
  */
 export function registerIpcHandlers(
   bridge: PythonBridge,
@@ -28,9 +89,14 @@ export function registerIpcHandlers(
   getMainWindow: () => BrowserWindow | null,
   settingsStore: SettingsStore,
   sessionLogger: SessionLogger,
+  reminderPreferencesStore: ReminderPreferencesStore,
+  reminderDispatcher: ReminderDispatcher,
 ): void {
-  // -- Session control handlers --
 
+  // Tracks currently-running test previews
+  const activeTests = new Map<string, ReminderStrategy>()
+  
+  // -- Session control handlers --
   ipcMain.handle(IPC_CHANNELS.START, (_event, args?: StartArgs) => {
     sessionManager.start({
       // Forward the user's settings to the Session Manager.
@@ -61,7 +127,6 @@ export function registerIpcHandlers(
   // -- Python bridge command handlers --
   ipcMain.handle(IPC_CHANNELS.SET_PREVIEW, (_event, args: SetPreviewArgs) => {
     // Send the command directly to the Python process via stdin.
-    // This is the only setting that can be changed mid-session.
     bridge.send({ type: 'set_preview', enabled: args.enabled })
   })
 
@@ -102,6 +167,96 @@ export function registerIpcHandlers(
     return settingsStore.load()
   })
 
+  ipcMain.handle(IPC_CHANNELS.GET_REMINDER_PREFERENCES, (): ReminderPreferences => {
+    return reminderPreferencesStore.load()
+  })
+
+  ipcMain.handle(IPC_CHANNELS.UPDATE_REMINDER_PREFERENCES, (_event, prefs: ReminderPreferences) => {
+    // We reject any request that would disable all four
+    // reminder strategies. 
+    const enabledCount = [
+      prefs.overlay.enabled,
+      prefs.screenEdgeGlow.enabled,
+      prefs.cornerPopup.enabled,
+      prefs.audioCue.enabled,
+    ].filter(Boolean).length
+
+    if (enabledCount === 0) {
+      throw new Error('At least one reminder strategy must be enabled')
+    }
+
+    // Save to disk first, then apply to the live dispatcher. .
+    reminderPreferencesStore.save(prefs)
+
+    // Apply each strategy's new settings to the live dispatcher.
+    applyStrategyPreference(reminderDispatcher, 'overlay', prefs.overlay.enabled, () => new OverlayReminderStrategy(), {})
+    applyStrategyPreference(reminderDispatcher, 'screen-edge-glow', prefs.screenEdgeGlow.enabled, () => new ScreenEdgeGlowStrategy(), { colour: prefs.screenEdgeGlow.colour, opacity: prefs.screenEdgeGlow.opacity })
+    applyStrategyPreference(reminderDispatcher, 'corner-popup', prefs.cornerPopup.enabled, () => new CornerPopupStrategy(), { corner: prefs.cornerPopup.corner })
+    applyStrategyPreference(reminderDispatcher, 'audio-cue', prefs.audioCue.enabled, () => new AudioCueStrategy(), { soundFile: prefs.audioCue.soundFile, volume: prefs.audioCue.volume })
+  })
+
+  ipcMain.handle(IPC_CHANNELS.TEST_REMINDER, async (_event, strategyId: string) => {
+    if (strategyId === 'overlay') {
+      const win = getMainWindow()
+      if (!win || win.isDestroyed()) return
+
+      const overlayTestUpdate: StateUpdate = {
+        type: 'state_update',
+        running: false,
+        reminderState: 'idle',
+        shouldShowReminder: true,
+        blinksPerMinute: 0,
+        totalBlinks: 0,
+        sessionDurationMs: 0,
+        faceDetected: false,
+        twentyTwentyState: { phase: 'idle', timeUntilBreakMs: 0, breakTimeRemainingMs: 0 },
+        remindersTriggered: 0,
+      }
+
+      win.webContents.send(IPC_CHANNELS.STATE_UPDATE, overlayTestUpdate)
+      await new Promise((resolve) => setTimeout(resolve, 3000))
+
+      if (!win.isDestroyed()) {
+        win.webContents.send(IPC_CHANNELS.STATE_UPDATE, { ...overlayTestUpdate, shouldShowReminder: false })
+      }
+      return
+    }
+
+    // -- Non-overlay strategies --
+    const factory = STRATEGY_FACTORIES[strategyId]
+    if (!factory) {
+      throw new Error(`Unknown strategy "${strategyId}"`)
+    }
+
+    // If a previous test for this same strategy is still running cancel it before starting a new one
+    const previous = activeTests.get(strategyId)
+    if (previous) {
+      previous.onReminderEnd()
+      previous.dispose()
+      activeTests.delete(strategyId)
+    }
+
+    // Create a fresh, temporary instance configured from the saved preferences. 
+    // We can't reuse the registered instance because the
+    // user might be testing a strategy they have currently disabled, so
+    // no registered instance exists at all.
+    const prefs = reminderPreferencesStore.load()
+    const config = getStrategyConfig(prefs, strategyId)
+    const strategy = factory()
+    strategy.configure(config)
+
+    activeTests.set(strategyId, strategy)
+
+    strategy.onReminderStart()
+    await new Promise((resolve) => setTimeout(resolve, 3000))
+
+    if (activeTests.get(strategyId) === strategy) {
+      strategy.onReminderEnd()
+      strategy.dispose()
+      activeTests.delete(strategyId)
+    }
+  })
+  
   // Forward Python events to the renderer
   bridge.on('event', (pythonEvent) => {
     const win = getMainWindow()

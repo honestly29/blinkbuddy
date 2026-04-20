@@ -16,6 +16,12 @@ const mockLoadSettings = vi.fn().mockResolvedValue(defaultSettings)
 const mockListCameras = vi.fn().mockResolvedValue([])    
 const mockSetPreview = vi.fn().mockResolvedValue(undefined)
 const mockGetSessionHistory = vi.fn().mockResolvedValue([])
+const mockGetReminderPreferences = vi.fn().mockResolvedValue({
+  overlay: { enabled: true },
+  screenEdgeGlow: { enabled: true, colour: '#38bdf8', opacity: 0.3 },
+  cornerPopup: { enabled: true, corner: 'bottom-right' },
+  audioCue: { enabled: true, soundFile: 'dragon-studio-ding.mp3', volume: 0.5 },
+})
 let stateCallback: ((state: StateUpdate) => void) | null = null
 const mockUnsubscribe = vi.fn()
 
@@ -45,6 +51,12 @@ beforeEach(() => {
   mockListCameras.mockClear().mockResolvedValue([])
   mockSetPreview.mockClear()
   mockGetSessionHistory.mockClear().mockResolvedValue([])
+  mockGetReminderPreferences.mockClear().mockResolvedValue({
+    overlay: { enabled: true },
+    screenEdgeGlow: { enabled: true, colour: '#38bdf8', opacity: 0.3 },
+    cornerPopup: { enabled: true, corner: 'bottom-right' },
+    audioCue: { enabled: true, soundFile: 'dragon-studio-ding.mp3', volume: 0.5 },
+  })
   mockUnsubscribe.mockClear()
 
   window.blinkBuddy = {
@@ -55,6 +67,9 @@ beforeEach(() => {
     listCameras: mockListCameras,
     setPreview: mockSetPreview,
     getSessionHistory: mockGetSessionHistory,
+    getReminderPreferences: mockGetReminderPreferences,
+    updateReminderPreferences: vi.fn().mockResolvedValue(undefined),
+    testReminder: vi.fn().mockResolvedValue(undefined),
     onStateUpdate: vi.fn((cb) => {
       stateCallback = cb
       return mockUnsubscribe

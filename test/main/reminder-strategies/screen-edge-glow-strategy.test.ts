@@ -4,10 +4,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // Mock Electron
 // ---------------------------------------------------------------------------
 // Tests run in Node.js, not Electron, so `import { BrowserWindow } from 'electron'`
-// would crash. vi.mock replaces the electron module with fakes before any imports run.
-//
-// Vitest ensures vi.mock() runs before imports, even though JavaScript
-// normally runs import statements first regardless of where they're written.
+// would crash. 
+// vi.mock replaces the electron module with fakes before any imports run.
 vi.mock('electron', () => {
   const BrowserWindow = vi.fn()
   const screen = {
@@ -22,9 +20,7 @@ import { BrowserWindow } from 'electron'
 import { ScreenEdgeGlowStrategy } from '../../../src/main/reminder-strategies/screen-edge-glow-strategy'
 
 /**
- * Creates a mock BrowserWindow instance with all the methods that
- * ScreenEdgeGlowStrategy calls. These are vi.fn() spies so tests
- * can verify which methods were called and with what arguments.
+ * Creates a mock BrowserWindow instance 
  */
 function createMockWindow() {
   return {
@@ -36,6 +32,9 @@ function createMockWindow() {
     hide: vi.fn(),
     close: vi.fn(),
     isDestroyed: vi.fn().mockReturnValue(false),
+    webContents: {
+      executeJavaScript: vi.fn().mockResolvedValue(undefined),
+    },
   }
 }
 
@@ -162,5 +161,35 @@ describe('ScreenEdgeGlowStrategy', () => {
     expect(decodeURIComponent(url)).toContain('box-shadow')
     // Verify the HTML contains the CSS glow effect
     expect(decodeURIComponent(url)).toContain('.glow')
+  })
+
+  // -------------------------------------------------------------------------
+  // configure()
+  // -------------------------------------------------------------------------
+
+  it('configure updates glow HTML colour for new windows', () => {
+    strategy.configure({ colour: '#ff0000', opacity: 0.5 })
+    strategy.onReminderStart()
+
+    const url = mockWin.loadURL.mock.calls[0][0] as string
+    const html = decodeURIComponent(url)
+    expect(html).toContain('rgba(255, 0, 0, 0.5)')
+  })
+
+  it('configure updates CSS via executeJavaScript on existing window', () => {
+    strategy.onReminderStart()
+    strategy.configure({ colour: '#00ff00', opacity: 0.8 })
+
+    expect(mockWin.webContents.executeJavaScript).toHaveBeenCalledTimes(1)
+    const js = mockWin.webContents.executeJavaScript.mock.calls[0][0] as string
+    expect(js).toContain('rgba(0, 255, 0, 0.8)')
+  })
+
+  it('configure with no window does not throw', () => {
+    expect(() => strategy.configure({ colour: '#123456' })).not.toThrow()
+  })
+
+  it('configure ignores unknown options', () => {
+    expect(() => strategy.configure({ unknown: 'value' })).not.toThrow()
   })
 })

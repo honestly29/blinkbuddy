@@ -1,15 +1,12 @@
 import type { ReminderStrategy } from './types'
 
 /**
- * Strategy that controls the renderer's amber blink-reminder overlay.
+ * Flag-based strategy: just tracks whether the reminder is currently active.
  *
- * Tracks an `active` flag that the SessionManager reads when building
- * the StateUpdate sent to the renderer. The renderer's <ReminderOverlay>
- * component shows or hides the amber banner based on this value.
- *
- * This strategy doesn't render anything itself - it just acts as a
- * bridge between the dispatcher's start/end events and the existing
- * overlay component in the UI.
+ * The actual overlay UI is drawn by the renderer. The Session Manager reads
+ * `active` and passes it to the renderer as `shouldShowReminder` in each
+ * StateUpdate message. That means this strategy does not own a BrowserWindow
+ * and has nothing to reconfigure at runtime.
  */
 export class OverlayReminderStrategy implements ReminderStrategy {
   readonly id = 'overlay'
@@ -26,6 +23,10 @@ export class OverlayReminderStrategy implements ReminderStrategy {
 
   onReminderEnd(): void {
     this._active = false
+  }
+
+  configure(_options: Record<string, unknown>): void {
+    // No configurable settings beyond enable/disable (which is handled by the dispatcher)
   }
 
   dispose(): void {

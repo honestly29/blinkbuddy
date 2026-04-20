@@ -30,6 +30,7 @@ function createMockWindow() {
     show: vi.fn(),
     hide: vi.fn(),
     close: vi.fn(),
+    setPosition: vi.fn(),
     isDestroyed: vi.fn().mockReturnValue(false),
   }
 }
@@ -157,5 +158,50 @@ describe('CornerPopupStrategy', () => {
     expect(url).toMatch(/^data:text\/html;charset=utf-8,/)
     expect(decodeURIComponent(url)).toContain('Remember to blink')
     expect(decodeURIComponent(url)).toContain('.popup')
+  })
+
+  // -------------------------------------------------------------------------
+  // configure()
+  // -------------------------------------------------------------------------
+
+  it('configure updates corner position for new windows', () => {
+    strategy.configure({ corner: 'top-left' })
+    strategy.onReminderStart()
+
+    const opts = MockBrowserWindow.mock.calls[0][0] as Record<string, unknown>
+    // Top-left with 20px margin
+    expect(opts.x).toBe(20)
+    expect(opts.y).toBe(20)
+  })
+
+  it('configure repositions existing window via setPosition', () => {
+    strategy.onReminderStart()
+    strategy.configure({ corner: 'top-right' })
+
+    expect(mockWin.setPosition).toHaveBeenCalledWith(1600, 20)
+  })
+
+  it('configure handles all four corners', () => {
+    // bottom-left
+    strategy.configure({ corner: 'bottom-left' })
+    strategy.onReminderStart()
+
+    const opts = MockBrowserWindow.mock.calls[0][0] as Record<string, unknown>
+    expect(opts.x).toBe(20)
+    expect(opts.y).toBe(980)
+  })
+
+  it('configure ignores invalid corner values', () => {
+    strategy.configure({ corner: 'invalid' })
+    strategy.onReminderStart()
+
+    const opts = MockBrowserWindow.mock.calls[0][0] as Record<string, unknown>
+    // Still bottom-right (default)
+    expect(opts.x).toBe(1600)
+    expect(opts.y).toBe(980)
+  })
+
+  it('configure with no window does not throw', () => {
+    expect(() => strategy.configure({ corner: 'top-left' })).not.toThrow()
   })
 })

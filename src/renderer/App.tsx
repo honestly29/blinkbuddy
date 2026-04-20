@@ -10,7 +10,7 @@ import { ReminderOverlay } from './components/ReminderOverlay'
 import { TwentyTwentyOverlay } from './components/TwentyTwentyOverlay'
 import { CvsTipsPanel } from './components/CvsTipsPanel'
 import { SessionHistory } from './components/SessionHistory'
-
+import { ReminderSettingsPanel } from './components/ReminderSettingsPanel'
 
 function App() {
   // -- Hook 1: Monitoring state and actions --
@@ -91,6 +91,8 @@ function App() {
           onPreviewChange={handlePreviewChange}
           onTwentyTwentyChange={setTwentyTwentyEnabled}
         />
+
+        <ReminderSettingsPanel running={running} />
 
         {/* Error banner: only rendered when the Python process crashes or exits */}
         {error && (
