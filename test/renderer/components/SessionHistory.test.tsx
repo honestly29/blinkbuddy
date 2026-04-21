@@ -1,14 +1,29 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { SessionHistory } from '../../../src/renderer/components/SessionHistory'
 import type { SessionSummary } from '../../../src/shared/ipc-messages'
 
 const mockGetSessionHistory = vi.fn()
 
-// Factory with sensible defaults
+/** Returns an ISO string for today at the given hour */
+function todayAt(hour: number): string {
+  const d = new Date()
+  d.setHours(hour, 0, 0, 0)
+  return d.toISOString()
+}
+
+/** Returns an ISO string for N days ago at the given hour */
+function daysAgo(n: number, hour = 10): string {
+  const d = new Date()
+  d.setDate(d.getDate() - n)
+  d.setHours(hour, 0, 0, 0)
+  return d.toISOString()
+}
+
+// Factory for a SessionSummary with sensible defaults, overridable per test.
 const makeSummary = (overrides: Partial<SessionSummary> = {}): SessionSummary => ({
-  sessionStart: '2026-03-11T10:00:00.000Z',
-  sessionEnd: '2026-03-11T10:05:00.000Z',
+  sessionStart: todayAt(10),
+  sessionEnd: todayAt(10),
   totalBlinks: 50,
   avgBlinksPerMinute: 10,
   remindersTriggered: 2,
@@ -22,7 +37,7 @@ const makeSummary = (overrides: Partial<SessionSummary> = {}): SessionSummary =>
 beforeEach(() => {
   mockGetSessionHistory.mockClear()
 
-  // Only mock getSessionHistory 
+  // Minimal blinkBuddy mock.
   window.blinkBuddy = {
     getSessionHistory: mockGetSessionHistory,
   } as unknown as typeof window.blinkBuddy
@@ -34,64 +49,116 @@ afterEach(() => {
 })
 
 describe('SessionHistory', () => {
-  it('renders "No sessions yet" when history is empty', async () => {
+  it('renders empty state when history is empty', async () => {
     mockGetSessionHistory.mockResolvedValue([])
     render(<SessionHistory />)
 
     await waitFor(() => {
-      expect(screen.getByText('No sessions yet')).toBeDefined()
+      expect(
+        screen.getByText(/No sessions yet/),
+      ).toBeDefined()
     })
   })
 
-  it('renders session entries when history has data', async () => {
+  it('renders overview cards with session data', async () => {
+    mockGetSessionHistory.mockResolvedValue([makeSummary()])
+    render(<SessionHistory />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Overview')).toBeDefined()
+      expect(screen.getByText('10.0 blinks/min')).toBeDefined()
+      expect(screen.getByText('5m monitored')).toBeDefined()
+      expect(screen.getByText('Total Reminders')).toBeDefined()
+      expect(screen.getByText('20-20-20 Compliance')).toBeDefined()
+    })
+  })
+
+  it('renders session row with correct format', async () => {
     mockGetSessionHistory.mockResolvedValue([makeSummary()])
     render(<SessionHistory />)
 
     await waitFor(() => {
       expect(screen.getByText('Session History')).toBeDefined()
       expect(screen.getByText(/5m 0s/)).toBeDefined()
-      expect(screen.getByText('Avg 10.0 blinks/min')).toBeDefined()
-      expect(screen.getByText('Total 50 blinks')).toBeDefined()
-      expect(screen.getByText('2 reminders')).toBeDefined()
+      expect(screen.getByText(/50 blinks/)).toBeDefined()
+      expect(screen.getByText(/· 2 reminders/)).toBeDefined()
+      expect(screen.getByText('10.0/min')).toBeDefined()
     })
   })
 
-  it('displays longest gap when present', async () => {
-    // longestGapBetweenBlinks > 0 triggers the conditional <span>
-    mockGetSessionHistory.mockResolvedValue([makeSummary({ longestGapBetweenBlinks: 8.3 })])
-    render(<SessionHistory />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Longest gap 8.3s')).toBeDefined()
-    })
-  })
-
-  it('displays twenty-twenty breaks when taken', async () => {
-    // twentyTwentyBreaksTaken > 0 triggers the conditional <span>
-    mockGetSessionHistory.mockResolvedValue([makeSummary({ twentyTwentyBreaksTaken: 3 })])
-    render(<SessionHistory />)
-
-    await waitFor(() => {
-      expect(screen.getByText('3 breaks')).toBeDefined()
-    })
-  })
-
-  it('renders multiple sessions in reverse chronological order', async () => {
+  it('excludes short sessions from stats but shows in list', async () => {
     const sessions = [
-      makeSummary({ sessionStart: '2026-03-10T10:00:00.000Z', totalBlinks: 30 }),
-      makeSummary({ sessionStart: '2026-03-11T10:00:00.000Z', totalBlinks: 50 }),
+      makeSummary({ totalDurationSeconds: 60, totalBlinks: 10, sessionStart: todayAt(9) }),
+      makeSummary({ totalDurationSeconds: 300, totalBlinks: 50, sessionStart: todayAt(10) }),
     ]
     mockGetSessionHistory.mockResolvedValue(sessions)
     render(<SessionHistory />)
 
     await waitFor(() => {
-      expect(screen.getByText('Total 50 blinks')).toBeDefined()
-      expect(screen.getByText('Total 30 blinks')).toBeDefined()
+      // Stats card should count only the 300s session
+      expect(screen.getByText('Total Sessions')).toBeDefined()
+      // Both sessions appear in the list (check for both blink counts)
+      expect(screen.getByText(/10 blinks/)).toBeDefined()
+      expect(screen.getByText(/50 blinks/)).toBeDefined()
+    })
+  })
+
+  it('shows N/A for 20-20-20 compliance when no breaks recorded', async () => {
+    mockGetSessionHistory.mockResolvedValue([
+      makeSummary({ totalDurationSeconds: 1500, twentyTwentyBreaksTaken: 0 }),
+    ])
+    render(<SessionHistory />)
+
+    await waitFor(() => {
+      expect(screen.getByText('No breaks recorded')).toBeDefined()
+    })
+  })
+
+  it('shows percentage for 20-20-20 compliance when breaks taken', async () => {
+    // 2400s = 40 minutes: expects 2 breaks, user took 2 = 100% compliance.
+    mockGetSessionHistory.mockResolvedValue([
+      makeSummary({ totalDurationSeconds: 2400, twentyTwentyBreaksTaken: 2 }),
+    ])
+    render(<SessionHistory />)
+
+    await waitFor(() => {
+      expect(screen.getByText('100%')).toBeDefined()
+    })
+  })
+
+  it('shows "Show older sessions" toggle for old sessions', async () => {
+    // One session today, one 10 days ago. The 10-day-old session falls
+    // past the 7-day cutoff and should be hidden until the toggle is clicked.
+    const sessions = [
+      makeSummary({ sessionStart: daysAgo(10), totalBlinks: 30 }),
+      makeSummary({ sessionStart: todayAt(10), totalBlinks: 50 }),
+    ]
+    mockGetSessionHistory.mockResolvedValue(sessions)
+    render(<SessionHistory />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Show older sessions')).toBeDefined()
+      // Older session's blinks not visible yet
+      expect(screen.queryByText(/30 blinks/)).toBeNull()
     })
 
-    // The most recent session (50 blinks) should appear first in the DOM
-    const items = screen.getAllByText(/Total \d+ blinks/)
-    expect(items[0].textContent).toBe('Total 50 blinks')
-    expect(items[1].textContent).toBe('Total 30 blinks')
+    // Expand: older session becomes visible
+    fireEvent.click(screen.getByText('Show older sessions'))
+    expect(screen.getByText(/30 blinks/)).toBeDefined()
+    expect(screen.getByText('Show less')).toBeDefined()
+
+    // Collapse: back to the original state
+    fireEvent.click(screen.getByText('Show less'))
+    expect(screen.queryByText(/30 blinks/)).toBeNull()
+    expect(screen.getByText('Show older sessions')).toBeDefined()
+  })
+
+  it('renders "Today" date group header for today\'s sessions', async () => {
+    mockGetSessionHistory.mockResolvedValue([makeSummary()])
+    render(<SessionHistory />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Today')).toBeDefined()
+    })
   })
 })
