@@ -18,7 +18,7 @@ export function PreviewCanvas({ visible }: PreviewCanvasProps) {
       return
     }
 
-    // Subscribe to all Python events and then filter for preview_frame only.
+    // Subscribe to preview_frame events coming from the Python process via IPC.
     const unsubscribe = window.blinkBuddy.onPythonEvent((event) => {
       if (event.type === 'preview_frame') {
         setFrame(event)
@@ -27,10 +27,8 @@ export function PreviewCanvas({ visible }: PreviewCanvasProps) {
 
     // Return the unsubscribe function as useEffect cleanup.
     return unsubscribe
-    
-  }, [visible]) // Re-run when visible changes
+  }, [visible]) 
 
-  // Render nothing if hidden or if no frame has arrived yet.
   if (!visible || !frame) {
     return null
   }
@@ -46,7 +44,7 @@ export function PreviewCanvas({ visible }: PreviewCanvasProps) {
         width={frame.width}
         height={frame.height}
         alt="Camera preview with face mesh overlay"
-        className="rounded"
+        className="mx-auto block -scale-x-100 rounded"
       />
     </div>
   )

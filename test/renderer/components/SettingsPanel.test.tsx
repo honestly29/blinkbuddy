@@ -17,7 +17,6 @@ const defaultProps = {
   running: false,
   onBlinkWindowChange: vi.fn(),
   onCameraChange: vi.fn(),
-  onPreviewChange: vi.fn(),
   onTwentyTwentyChange: vi.fn(),
 }
 
@@ -29,7 +28,6 @@ describe('SettingsPanel', () => {
     expect(screen.getByText('Camera')).toBeDefined()
     expect(screen.getByText('Blink window (seconds)')).toBeDefined()
     expect(screen.getByText('20-20-20 break reminders')).toBeDefined()
-    expect(screen.getByText('Camera preview')).toBeDefined()
   })
 
   // -- Disabled-when-running tests --
@@ -50,20 +48,10 @@ describe('SettingsPanel', () => {
   it('disables 20-20-20 toggle when running', () => {
     render(<SettingsPanel {...defaultProps} running={true} />)
     const buttons = screen.getAllByRole('button')
-    // The 20-20-20 toggle button is the one that's disabled
     const twentyTwentyButton = buttons.find(
       b => b.className.includes('rounded-full'),
     )
     expect(twentyTwentyButton).toBeDefined()
     expect((twentyTwentyButton as HTMLButtonElement).disabled).toBe(true)
-  })
-
-  it('does NOT disable preview toggle when running', () => {
-    // Preview remains interactive during a session
-    render(<SettingsPanel {...defaultProps} running={true} />)
-    const disabledButton = screen.getByText('Disabled')
-    const enabledButton = screen.getByText('Enabled')
-    expect((disabledButton as HTMLButtonElement).disabled).toBeFalsy()
-    expect((enabledButton as HTMLButtonElement).disabled).toBeFalsy()
   })
 })

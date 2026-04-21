@@ -13,7 +13,7 @@ const mockStart = vi.fn().mockResolvedValue(undefined)
 const mockStop = vi.fn().mockResolvedValue(undefined)
 const mockSaveSettings = vi.fn().mockResolvedValue(undefined)
 const mockLoadSettings = vi.fn().mockResolvedValue(defaultSettings)
-const mockListCameras = vi.fn().mockResolvedValue([])    
+const mockListCameras = vi.fn().mockResolvedValue([])
 const mockSetPreview = vi.fn().mockResolvedValue(undefined)
 const mockGetSessionHistory = vi.fn().mockResolvedValue([])
 const mockGetReminderPreferences = vi.fn().mockResolvedValue({
@@ -86,25 +86,24 @@ describe('App', () => {
   // --- Integration test: renders the full App component tree ---
   it('renders initial stopped state correctly', () => {
     render(<App />)
-
     // Verify elements from multiple child components are all present
-    expect(screen.getByText('BlinkBuddy')).toBeDefined()  // Header
-    expect(screen.getByText('Stopped')).toBeDefined()  // StatusPanel
-    expect(screen.getByText('Start Monitoring')).toBeDefined()  // StartStopControls
-    expect(screen.getByText('00:00')).toBeDefined()  // BlinkStatsPanel duration
-    expect(screen.getByText('0')).toBeDefined()  // BlinkStatsPanel total blinks
-    expect(screen.getByText('0.0')).toBeDefined()  // BlinkStatsPanel blinks/min
+    expect(screen.getByText('BlinkBuddy')).toBeDefined()
+    expect(screen.getByText('Stopped')).toBeDefined()
+    expect(screen.getByText('Start Monitoring')).toBeDefined()
+    expect(screen.getByText('00:00')).toBeDefined()
+    expect(screen.getByText('0')).toBeDefined()
+    expect(screen.getByText('0.0')).toBeDefined()
   })
 
-  // Verify the settings panel is rendered with all sub-components
-  it('renders settings panel', () => {
+  it('renders settings panel on Settings tab', () => {
     render(<App />)
 
-    expect(screen.getByText('Settings')).toBeDefined()
+    fireEvent.click(screen.getByText('Settings'))
+
+    expect(screen.getByRole('heading', { name: 'Settings' })).toBeDefined()
     expect(screen.getByText('Camera')).toBeDefined()
     expect(screen.getByText('Blink window (seconds)')).toBeDefined()
     expect(screen.getByText('20-20-20 break reminders')).toBeDefined()
-    expect(screen.getByText('Camera preview')).toBeDefined()
   })
   
   it('updates to running state with face detected', () => {
@@ -119,7 +118,6 @@ describe('App', () => {
         sessionDurationMs: 65000,
       }))
     })
-
     // Verify all affected components updated correctly from the single state update
     expect(screen.getByText('Face Detected')).toBeDefined()
     expect(screen.getByText('Stop Monitoring')).toBeDefined()
@@ -139,7 +137,6 @@ describe('App', () => {
         reminderState: 'overdue',
       }))
     })
-
     // Verify the overlay is visible with correct CSS classes
     const overlay = screen.getByRole('alert')
     expect(overlay.textContent).toBe('Remember to blink!')
@@ -190,7 +187,6 @@ describe('App', () => {
  
   it('calls stop when Stop Monitoring is clicked', async () => {
     render(<App />)
-
     // First, transition to running state so the Stop button appears
     act(() => {
       stateCallback!(makeStateUpdate({ running: true }))

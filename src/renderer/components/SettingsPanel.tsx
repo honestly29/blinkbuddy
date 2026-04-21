@@ -2,16 +2,14 @@ import type { UserSettings } from '../../shared/ipc-messages'
 import type { CameraInfo } from '../../shared/protocol'
 import { CameraSelector } from './CameraSelector'
 import { BlinkWindowInput } from './BlinkWindowInput'
-import { PreviewToggle } from './PreviewToggle'
 
 interface SettingsPanelProps {
   settings: UserSettings
   cameras: CameraInfo[]
   camerasLoading: boolean
-  running: boolean
+  running: boolean         // disables controls that cannot safely change mid-session
   onBlinkWindowChange: (seconds: number) => void
   onCameraChange: (index: number) => void
-  onPreviewChange: (enabled: boolean) => void
   onTwentyTwentyChange: (enabled: boolean) => void
 }
 
@@ -32,14 +30,13 @@ export function SettingsPanel({
   running,
   onBlinkWindowChange,
   onCameraChange,
-  onPreviewChange,
   onTwentyTwentyChange,
 }: SettingsPanelProps) {
   return (
     <div className="rounded-lg bg-gray-800 p-4">
       <h2 className="mb-4 text-lg font-semibold text-white">Settings</h2>
       <div className="space-y-4">
-        {/* Camera dropdown - disabled when running (can't switch mid-session) */}
+        {/* Camera dropdown - disabled when running */}
         <CameraSelector
           cameras={cameras}
           selectedIndex={settings.cameraIndex}
@@ -48,7 +45,7 @@ export function SettingsPanel({
           onChange={onCameraChange}
         />
 
-        {/* Blink window input - disabled when running (would invalidate current window) */}
+        {/* Blink window input - disabled when running */}
         <BlinkWindowInput
           value={settings.blinkWindowSeconds}
           disabled={running}
@@ -72,8 +69,6 @@ export function SettingsPanel({
             />
           </button>
         </div>
-        {/* Preview toggle - never disabled, can be changed mid-session */}
-        <PreviewToggle enabled={settings.previewEnabled} onChange={onPreviewChange} />
       </div>
     </div>
   )

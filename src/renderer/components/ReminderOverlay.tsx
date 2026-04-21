@@ -12,14 +12,12 @@ interface ReminderOverlayProps {
 export function ReminderOverlay({ visible }: ReminderOverlayProps) {
   return (
     <div
-      className={`fixed inset-x-0 bottom-0 bg-amber-500 px-6 py-4 text-center text-lg font-semibold text-black transition-all duration-300 ease-in-out ${
+      className={`fixed inset-x-0 bottom-0 z-10 bg-amber-500 px-6 py-4 text-center text-lg font-semibold text-black transition-all duration-300 ease-in-out ${
         visible
-          // Visible state: slide into view, fully opaque
           ? 'translate-y-0 opacity-100'
-          // Hidden state: push off-screen below viewport, fully transparent and disable pointer events so doesn't block clicks
           : 'pointer-events-none translate-y-full opacity-0'
       }`}
-      role="alert"  // ARIA live region so screen readers announce the reminder (accessibility)
+      role="alert"
     >
       Remember to blink!
     </div>

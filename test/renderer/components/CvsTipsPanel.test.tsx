@@ -3,28 +3,34 @@ import { render, screen } from '@testing-library/react'
 import { CvsTipsPanel } from '../../../src/renderer/components/CvsTipsPanel'
 
 describe('CvsTipsPanel', () => {
-  it('renders the section heading', () => {
+  // Check for the section headings, a few representative content snippets, and the distinct disclaimer styling.
+
+  it('renders all section headings', () => {
     render(<CvsTipsPanel />)
-    expect(screen.getByText('Eye Health Tips')).toBeDefined()
+    expect(screen.getByText('What is Computer Vision Syndrome?')).toBeDefined()
+    expect(screen.getByText('How BlinkBuddy helps')).toBeDefined()
+    expect(screen.getByText('Quick start guide')).toBeDefined()
+    expect(screen.getByText('The 20-20-20 rule')).toBeDefined()
+    expect(screen.getByText('Screen setup tips')).toBeDefined()
+    expect(screen.getByText('Lighting and environment')).toBeDefined()
+    expect(screen.getByText('Important note')).toBeDefined()
   })
 
-  it('renders all five tips', () => {
-    // Verify every tip title is present in the DOM.
+  it('renders key content snippets', () => {
     render(<CvsTipsPanel />)
-    expect(screen.getByText('20-20-20 Rule')).toBeDefined()
-    expect(screen.getByText('Screen Distance')).toBeDefined()
-    expect(screen.getByText('Blink Awareness')).toBeDefined()
-    expect(screen.getByText('Lighting')).toBeDefined()
-    expect(screen.getByText('Font Size')).toBeDefined()
+    // Regex matchers here so the test stays resilient to small edits
+    expect(screen.getByText(/digital eye strain/)).toBeDefined()
+    expect(screen.getByText(/monitor your blink rate in real time/)).toBeDefined()
+    expect(screen.getByText(/Go to Settings and choose your camera/)).toBeDefined()
+    expect(screen.getByText(/50-70 cm/)).toBeDefined()
   })
 
-  it('renders tip descriptions', () => {
-    // Uses regex patterns (/.../) rather than exact string matching
+  it('renders the disclaimer with distinct styling', () => {
     render(<CvsTipsPanel />)
-    expect(screen.getByText(/Every 20 minutes/)).toBeDefined()
-    expect(screen.getByText(/50–70 cm/)).toBeDefined()
-    expect(screen.getByText(/reduce your blink rate/)).toBeDefined()
-    expect(screen.getByText(/Match your screen brightness/)).toBeDefined()
-    expect(screen.getByText(/at least 12pt/)).toBeDefined()
+    // The disclaimer is visually distinct (amber border + amber heading)
+    const heading = screen.getByText('Important note')
+    expect(heading.className).toContain('text-amber')
+    const card = heading.closest('div')
+    expect(card?.className).toContain('border-amber')
   })
 })
