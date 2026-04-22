@@ -6,7 +6,7 @@ import { registerIpcHandlers } from './ipc-handlers'
 import { SettingsStore } from './settings-store'
 import { ReminderPreferencesStore } from './reminder-preferences-store'
 import { SessionLogger } from './session-logger'
-import { ReminderDispatcher, OverlayReminderStrategy, ScreenEdgeGlowStrategy, CornerPopupStrategy, AudioCueStrategy } from './reminder-strategies'
+import { ReminderDispatcher, OverlayReminderStrategy, ScreenEdgeGlowStrategy, CornerPopupStrategy, AudioCueStrategy, TwentyTwentyPopupStrategy, TwentyTwentyAudioStrategy } from './reminder-strategies'
 import type { ReminderStrategy } from './reminder-strategies/types'
 
 let mainWindow: BrowserWindow | null = null
@@ -14,6 +14,7 @@ let pythonBridge: PythonBridge | null = null
 let sessionManager: SessionManager | null = null
 let reminderDispatcher: ReminderDispatcher | null = null
 let sessionLogger: SessionLogger | null = null
+let twentyTwentyDispatcher: ReminderDispatcher | null = null
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -79,6 +80,14 @@ app.whenReady().then(() => {
   // Create reminder dispatcher with strategies
   reminderDispatcher = new ReminderDispatcher(strategies)
 
+  // Construct the 20-20-20 dispatcher
+  const twentyTwentyPopup = new TwentyTwentyPopupStrategy()
+  twentyTwentyPopup.configure({ corner: prefs.cornerPopup.corner })
+  
+  const twentyTwentyAudio = new TwentyTwentyAudioStrategy()
+  twentyTwentyAudio.configure({ volume: prefs.audioCue.volume })
+  twentyTwentyDispatcher = new ReminderDispatcher([twentyTwentyPopup, twentyTwentyAudio])
+
   // Create session manager
   sessionManager = new SessionManager({
     bridge: pythonBridge,
@@ -88,6 +97,7 @@ app.whenReady().then(() => {
       }
     },
     reminderDispatcher,
+    twentyTwentyDispatcher,
   })
 
   // Create settings store and session logger
@@ -95,7 +105,7 @@ app.whenReady().then(() => {
   sessionLogger = new SessionLogger(app.getPath('userData'))
 
   // Register IPC handlers before creating the window
-  registerIpcHandlers(pythonBridge, sessionManager, () => mainWindow, settingsStore, sessionLogger, reminderPreferencesStore, reminderDispatcher)
+  registerIpcHandlers(pythonBridge, sessionManager, () => mainWindow, settingsStore, sessionLogger, reminderPreferencesStore, reminderDispatcher, twentyTwentyDispatcher)
 
   createWindow()
 })
@@ -106,7 +116,10 @@ app.on('window-all-closed', () => {
 })
 
 app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.show()
+    mainWindow.focus()
+  } else {
     createWindow()
   }
 })
@@ -136,6 +149,8 @@ app.on('before-quit', (event) => {
 
     // Dispose reminder strategies (closes glow window if it exists)
     reminderDispatcher?.dispose()
+
+    twentyTwentyDispatcher?.dispose()
 
     // Kill Python process, then re-trigger app.quit() to actually exit
     pythonBridge.kill().finally(() => {

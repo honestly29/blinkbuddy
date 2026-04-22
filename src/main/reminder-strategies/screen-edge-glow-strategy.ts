@@ -1,4 +1,4 @@
-import { BrowserWindow, screen } from 'electron'
+import { app, BrowserWindow, screen } from 'electron'
 import type { ReminderStrategy } from './types'
 
 /**
@@ -30,7 +30,7 @@ export class ScreenEdgeGlowStrategy implements ReminderStrategy {
 
   onReminderStart(): void {
     const win = this.ensureWindow()
-    win.show()
+    win.showInactive()
   }
 
   onReminderEnd(): void {
@@ -120,10 +120,19 @@ export class ScreenEdgeGlowStrategy implements ReminderStrategy {
     })
 
     this.window.setIgnoreMouseEvents(true)
+
     // `visibleOnFullScreen: true` keeps the glow visible even when the user is in a fullscreen app
     this.window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+
     // 'screen-saver' is the highest level, so nothing else can cover the glow.
     this.window.setAlwaysOnTop(true, 'screen-saver')
+
+    // macOS bug workaround: setVisibleOnAllWorkspaces(true) hides
+    // the dock icon. Re-registering the dock afterwards restores it
+    if (process.platform === 'darwin' && app.dock) {
+      app.dock.show()
+    }
+
     // Load the HTML inline via a data: URL.
     this.window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(this.buildGlowHtml())}`)
 

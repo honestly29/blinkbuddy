@@ -52,6 +52,8 @@ export interface SessionManagerDeps {
   throttleMs?: number
   /** Reminder presentation dispatcher. Defaults to overlay-only if not provided. */
   reminderDispatcher?: ReminderDispatcher
+  /** Dispatcher for 20-20-20 break strategies. Defaults to an empty dispatcher. */
+  twentyTwentyDispatcher?: ReminderDispatcher
 }
 
 // ---------------------------------------------------------------------------
@@ -69,6 +71,7 @@ export class SessionManager {
   private sendToRenderer: (channel: string, data: StateUpdate) => void
   private throttleMs: number
   private reminderDispatcher: ReminderDispatcher
+  private twentyTwentyDispatcher: ReminderDispatcher
 
   // -- Domain objects (re-created on each start()) --
   private blinkWindow = new BlinkWindow()
@@ -111,6 +114,7 @@ export class SessionManager {
     // Default 100ms throttle in production; tests pass 0 to disable
     this.throttleMs = deps.throttleMs ?? 100
     this.reminderDispatcher = deps.reminderDispatcher ?? new ReminderDispatcher([new OverlayReminderStrategy()])
+    this.twentyTwentyDispatcher = deps.twentyTwentyDispatcher ?? new ReminderDispatcher()
   }
 
   // -------------------------------------------------------------------------
@@ -130,6 +134,7 @@ export class SessionManager {
 
     this.reminderState = 'idle'
     this.reminderDispatcher.deactivate()
+    this.twentyTwentyDispatcher.deactivate() 
     this.faceDetected = false
     this.remindersTriggered = 0
     this.twentyTwentyBreaksTaken = 0
@@ -197,6 +202,7 @@ export class SessionManager {
     this.lastTwentyTwentyState = { ...IDLE_TWENTY_TWENTY }
     this.reminderState = 'idle'
     this.reminderDispatcher.deactivate()
+    this.twentyTwentyDispatcher.deactivate()
 
     // Push final state, bypassing throttle (high-priority transition)
     this.pushStateUpdate()
@@ -204,6 +210,24 @@ export class SessionManager {
 
   isRunning(): boolean {
     return this.running
+  }
+
+  setTwentyTwentyEnabled(enabled: boolean): void {
+    if (!this.running) return
+
+    if (enabled) {
+      if (this.twentyTwenty.getPhase() !== 'idle') return
+      const now = Date.now()
+      this.twentyTwenty.start(now)
+      this.lastTwentyTwentyState = this.twentyTwenty.tick(now)
+    } else {
+      if (this.twentyTwenty.getPhase() === 'idle') return
+      this.twentyTwentyDispatcher.cancel()
+      this.twentyTwenty.stop()
+      this.lastTwentyTwentyState = { ...IDLE_TWENTY_TWENTY }
+    }
+
+    this.pushStateUpdate()
   }
 
    /**
@@ -277,7 +301,8 @@ export class SessionManager {
     )
 
     this.reminderState = result.state
-    this.reminderDispatcher.update(result.shouldShowReminder)
+    const isBreakActive = this.twentyTwenty.getPhase() === 'break_active' 
+    this.reminderDispatcher.update(!isBreakActive && result.shouldShowReminder) 
     if (result.shouldResetTimer) {
       this.blinkWindow.reset(timestamp)
     }
@@ -298,7 +323,9 @@ export class SessionManager {
     )
 
     this.reminderState = result.state
+    const isBreakActive = this.twentyTwenty.getPhase() === 'break_active' 
     this.reminderDispatcher.update(result.shouldShowReminder)
+    this.reminderDispatcher.update(!isBreakActive && result.shouldShowReminder) 
     if (result.shouldResetTimer) {
       this.blinkWindow.reset(timestamp)
     }
@@ -312,6 +339,16 @@ export class SessionManager {
 
     const now = Date.now()
 
+    // Evaluate 20-20-20 first so we can suppress blink reminders during the break
+    const newTtState = this.twentyTwenty.tick(now)
+    if (this.lastTwentyTwentyState.phase === 'break_active' && newTtState.phase === 'waiting') {
+      this.twentyTwentyBreaksTaken++
+    }
+    this.lastTwentyTwentyState = newTtState
+    const isBreakActive = newTtState.phase === 'break_active'
+
+    this.twentyTwentyDispatcher.update(isBreakActive)
+
     // Evaluate reminder state machine with a timer tick 
     const result = transition(
       this.reminderState,
@@ -324,21 +361,9 @@ export class SessionManager {
     if (result.state === 'overdue' && this.reminderState !== 'overdue') {
       this.remindersTriggered++
     }
-
     this.reminderState = result.state
-    this.reminderDispatcher.update(result.shouldShowReminder)
-
-    // -- Evaluate 20-20-20 timer --
-    // Store the new state in a temp variable first so we can compare
-    // the PREVIOUS phase with the NEW phase before overwriting.
-    const newTtState = this.twentyTwenty.tick(now)
-
-    // Detect completed breaks: break_active -> waiting means the 20-second break
-    // just finished and the timer auto-reset to a new 20-minute cycle.
-    if (this.lastTwentyTwentyState.phase === 'break_active' && newTtState.phase === 'waiting') {
-      this.twentyTwentyBreaksTaken++
-    }
-    this.lastTwentyTwentyState = newTtState
+    // Suppress blink reminders during the 20-20-20 break window
+    this.reminderDispatcher.update(!isBreakActive && result.shouldShowReminder)
 
     this.pushStateUpdate()
   }
@@ -385,6 +410,7 @@ export class SessionManager {
     this.lastTwentyTwentyState = { ...IDLE_TWENTY_TWENTY }
     this.reminderState = 'idle'
     this.reminderDispatcher.deactivate()
+    this.twentyTwentyDispatcher.deactivate()
   }
 
 

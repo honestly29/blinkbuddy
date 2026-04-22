@@ -72,8 +72,10 @@ describe('ReminderDispatcher', () => {
     expect(strategyA.onReminderEnd).toHaveBeenCalledTimes(2)
   })
 
-  // -- deactivate() tests --
 
+  // ------------------------------------------------------------------------
+  // deactivate() tests 
+  // -------------------------------------------------------------------------
   it('deactivate calls onReminderEnd when active', () => {
     dispatcher.update(true)
     strategyA.onReminderEnd.mockClear()
@@ -103,7 +105,73 @@ describe('ReminderDispatcher', () => {
     expect(strategyA.onReminderStart).toHaveBeenCalledTimes(1)
   })
 
-  // -- dispose() tests --
+  // -------------------------------------------------------------------------
+  // cancel() tests
+  // -------------------------------------------------------------------------
+
+  it('cancel falls back to onReminderEnd when onReminderCancel is not defined', () => {
+    dispatcher.update(true)
+    strategyA.onReminderEnd.mockClear()
+    strategyB.onReminderEnd.mockClear()
+
+    dispatcher.cancel()
+
+    expect(strategyA.onReminderEnd).toHaveBeenCalledTimes(1)
+    expect(strategyB.onReminderEnd).toHaveBeenCalledTimes(1)
+  })
+
+  it('cancel prefers onReminderCancel over onReminderEnd when defined', () => {
+    // Build a strategy that defines both hooks so we can confirm the
+    // dispatcher picks cancel, not end, when both are available.
+    const cancelStrategy: ReminderStrategy & {
+      onReminderStart: ReturnType<typeof vi.fn>
+      onReminderEnd: ReturnType<typeof vi.fn>
+      onReminderCancel: ReturnType<typeof vi.fn>
+      configure: ReturnType<typeof vi.fn>
+      dispose: ReturnType<typeof vi.fn>
+    } = {
+      id: 'cancellable',
+      onReminderStart: vi.fn(),
+      onReminderEnd: vi.fn(),
+      onReminderCancel: vi.fn(),
+      configure: vi.fn(),
+      dispose: vi.fn(),
+    }
+    const mixedDispatcher = new ReminderDispatcher([cancelStrategy, strategyA])
+    mixedDispatcher.update(true)
+    cancelStrategy.onReminderEnd.mockClear()
+    cancelStrategy.onReminderCancel.mockClear()
+    strategyA.onReminderEnd.mockClear()
+
+    mixedDispatcher.cancel()
+
+    expect(cancelStrategy.onReminderCancel).toHaveBeenCalledTimes(1)
+    expect(cancelStrategy.onReminderEnd).not.toHaveBeenCalled()
+    // Strategy without onReminderCancel still receives onReminderEnd
+    expect(strategyA.onReminderEnd).toHaveBeenCalledTimes(1)
+  })
+
+  it('cancel is a no-op when inactive', () => {
+    dispatcher.cancel()
+
+    expect(strategyA.onReminderEnd).not.toHaveBeenCalled()
+    expect(strategyA.onReminderStart).not.toHaveBeenCalled()
+  })
+
+  it('cancel resets wasActive so next update(true) re-fires onReminderStart', () => {
+    dispatcher.update(true)
+    dispatcher.cancel()
+    strategyA.onReminderStart.mockClear()
+
+    dispatcher.update(true)
+
+    expect(strategyA.onReminderStart).toHaveBeenCalledTimes(1)
+    expect(dispatcher.isActive).toBe(true)
+  })
+
+  // ------------------------------------------------------------------------
+  // dispose() tests 
+  // -------------------------------------------------------------------------
 
   it('dispose calls onReminderEnd then dispose when active', () => {
     dispatcher.update(true)

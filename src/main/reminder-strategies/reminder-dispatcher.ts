@@ -94,6 +94,21 @@ export class ReminderDispatcher {
     }
   }
 
+  
+  // Like deactivate(), but treats the transition as a user-driven cancellation rather than a natural end. 
+  cancel(): void {
+    if (this.wasActive) {
+      this.wasActive = false
+      for (const s of this.strategies) {
+        if (s.onReminderCancel) {
+          s.onReminderCancel()
+        } else {
+          s.onReminderEnd()    // falls back to onReminderEnd()
+        }
+      }
+    }
+  }
+
   // Called on app quit. Ensures every strategy's BrowserWindow and other
   // resources are released before Electron exits.
   dispose(): void {

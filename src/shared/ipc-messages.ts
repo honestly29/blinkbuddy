@@ -17,6 +17,7 @@ export const IPC_CHANNELS = {
   START: 'blink:start',
   STOP: 'blink:stop',
   SET_PREVIEW: 'blink:set-preview',
+  SET_TWENTY_TWENTY: 'blink:set-twenty-twenty',
   LIST_CAMERAS: 'blink:list-cameras',
   GET_SESSION_HISTORY: 'blink:get-session-history',
   SAVE_SETTINGS: 'blink:save-settings',
@@ -55,6 +56,10 @@ export interface StartArgs {
 }
 
 export interface SetPreviewArgs {
+  enabled: boolean
+}
+
+export interface SetTwentyTwentyArgs {
   enabled: boolean
 }
 
@@ -108,6 +113,7 @@ export interface BlinkBuddyAPI {
   start: (args?: StartArgs) => Promise<void>
   stop: () => Promise<void>
   setPreview: (args: SetPreviewArgs) => Promise<void>
+  setTwentyTwenty: (args: SetTwentyTwentyArgs) => Promise<void>
   listCameras: () => Promise<CameraInfo[]>
   getSessionHistory: () => Promise<SessionSummary[]>
   saveSettings: (settings: UserSettings) => Promise<void>

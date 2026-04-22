@@ -19,6 +19,12 @@ export interface ReminderStrategy {
   /** Called once when the reminder transitions to inactive (idle or suppressed). */
   onReminderEnd(): void
 
+  /**
+   * Optional. Called when the reminder is cancelled by user action rather than by reaching its natural end.
+   * Strategies should clean up visual state but suppress any
+   * audible "end" feedback  */
+  onReminderCancel?(): void
+
   /** Apply runtime configuration (colour, volume, corner, etc.). */
   configure(options: Record<string, unknown>): void
 

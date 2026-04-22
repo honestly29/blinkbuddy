@@ -57,10 +57,10 @@ export function SettingsPanel({
           <label className="text-sm text-gray-300">20-20-20 break reminders</label>
           <button
             onClick={() => onTwentyTwentyChange(!settings.twentyTwentyEnabled)}
-            disabled={running}
-            className={`relative h-6 w-11 rounded-full transition-colors ${
-              running ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
-            } ${settings.twentyTwentyEnabled ? 'bg-green-600' : 'bg-gray-600'}`}
+            className={`relative h-6 w-11 cursor-pointer rounded-full transition-colors ${
+              settings.twentyTwentyEnabled ? 
+              'bg-green-600' : 'bg-gray-600'
+            }`}
           >
             <span
               className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${

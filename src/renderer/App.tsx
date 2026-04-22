@@ -7,7 +7,6 @@ import { PreviewCanvas } from './components/PreviewCanvas'
 import { SettingsPanel } from './components/SettingsPanel'
 import { StartStopControls } from './components/StartStopControls'
 import { ReminderOverlay } from './components/ReminderOverlay'
-import { TwentyTwentyOverlay } from './components/TwentyTwentyOverlay'
 import { ReminderSettingsPanel } from './components/ReminderSettingsPanel'
 import { CvsTipsPanel } from './components/CvsTipsPanel'
 import { SessionHistory } from './components/SessionHistory'
@@ -24,7 +23,6 @@ function App() {
     sessionDurationMs,
     faceDetected,
     shouldShowReminder,
-    twentyTwentyState,
     error,
     start,
     stop,
@@ -60,6 +58,13 @@ function App() {
       setPreviewEnabled(enabled, running)
     },
     [setPreviewEnabled, running],
+  )
+
+  const handleTwentyTwentyChange = useCallback(
+    (enabled: boolean) => {
+      setTwentyTwentyEnabled(enabled, running)
+    },
+    [setTwentyTwentyEnabled, running],
   )
 
   // --- Tab routing state ---
@@ -138,7 +143,7 @@ function App() {
               running={running}
               onBlinkWindowChange={setBlinkWindow}
               onCameraChange={setCameraIndex}
-              onTwentyTwentyChange={setTwentyTwentyEnabled}
+              onTwentyTwentyChange={handleTwentyTwentyChange}
             />
             <ReminderSettingsPanel running={running} />
           </>
@@ -148,10 +153,6 @@ function App() {
       <TabBar tabs={TABS} activeTab={activeTab} onTabChange={setActiveTab} />
 
       <ReminderOverlay visible={shouldShowReminder} />
-      <TwentyTwentyOverlay
-        phase={twentyTwentyState.phase}
-        breakTimeRemainingMs={twentyTwentyState.breakTimeRemainingMs}
-      />
     </div>
   )
 }

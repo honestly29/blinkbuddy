@@ -1,4 +1,4 @@
-import { BrowserWindow, screen } from 'electron'
+import { app, BrowserWindow, screen } from 'electron'
 import type { ReminderStrategy } from './types'
 import type { CornerPosition } from '../../shared/ipc-messages'
 
@@ -51,7 +51,7 @@ export class CornerPopupStrategy implements ReminderStrategy {
 
   onReminderStart(): void {
     const win = this.ensureWindow()
-    win.show()
+    win.showInactive()
   }
 
   onReminderEnd(): void {
@@ -120,6 +120,13 @@ export class CornerPopupStrategy implements ReminderStrategy {
     this.window.setIgnoreMouseEvents(true)
     this.window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
     this.window.setAlwaysOnTop(true, 'screen-saver')
+
+    // macOS bug workaround: setVisibleOnAllWorkspaces(true) hides
+    // the dock icon. Re-registering the dock afterwards restores it
+    if (process.platform === 'darwin' && app.dock) {
+      app.dock.show()
+    }
+    
     this.window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(POPUP_HTML)}`)
 
     return this.window

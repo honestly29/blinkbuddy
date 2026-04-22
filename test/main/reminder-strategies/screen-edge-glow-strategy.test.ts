@@ -1,10 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ---------------------------------------------------------------------------
-// Mock Electron
+// Mock Electron — factory must not reference top-level variables
 // ---------------------------------------------------------------------------
-// Tests run in Node.js, not Electron, so `import { BrowserWindow } from 'electron'`
-// would crash. 
+// Tests run in Node.js, not Electron, so `import { BrowserWindow } from 'electron' would crash. 
 // vi.mock replaces the electron module with fakes before any imports run.
 vi.mock('electron', () => {
   const BrowserWindow = vi.fn()
@@ -13,15 +12,17 @@ vi.mock('electron', () => {
       bounds: { x: 0, y: 0, width: 1920, height: 1080 },  // Simulated monitor dimensions
     }),
   }
-  return { BrowserWindow, screen }
+  // Used for the macOS dock-icon restoration test below.
+  const app = { dock: { show: vi.fn().mockResolvedValue(undefined) } }
+  return { app, BrowserWindow, screen }
 })
 
-import { BrowserWindow } from 'electron'
+import { app, BrowserWindow } from 'electron'
 import { ScreenEdgeGlowStrategy } from '../../../src/main/reminder-strategies/screen-edge-glow-strategy'
 
-/**
- * Creates a mock BrowserWindow instance 
- */
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 function createMockWindow() {
   return {
     setIgnoreMouseEvents: vi.fn(),
@@ -29,6 +30,7 @@ function createMockWindow() {
     setAlwaysOnTop: vi.fn(),
     loadURL: vi.fn(),
     show: vi.fn(),
+    showInactive: vi.fn(),
     hide: vi.fn(),
     close: vi.fn(),
     isDestroyed: vi.fn().mockReturnValue(false),
@@ -66,7 +68,7 @@ describe('ScreenEdgeGlowStrategy', () => {
     strategy.onReminderStart()
 
     expect(MockBrowserWindow).toHaveBeenCalledTimes(1)
-    expect(mockWin.show).toHaveBeenCalledTimes(1)
+    expect(mockWin.showInactive).toHaveBeenCalledTimes(1)
   })
 
   it('reuses existing window on second onReminderStart', () => {
@@ -75,7 +77,7 @@ describe('ScreenEdgeGlowStrategy', () => {
     strategy.onReminderStart()
 
     expect(MockBrowserWindow).toHaveBeenCalledTimes(1)  // Created once
-    expect(mockWin.show).toHaveBeenCalledTimes(2)       // Shown twice
+    expect(mockWin.showInactive).toHaveBeenCalledTimes(2)       // Shown twice
   })
 
   it('hides window on onReminderEnd', () => {
@@ -112,7 +114,7 @@ describe('ScreenEdgeGlowStrategy', () => {
     strategy.onReminderStart()
 
     expect(MockBrowserWindow).toHaveBeenCalledTimes(2)
-    expect(freshWin.show).toHaveBeenCalledTimes(1)
+    expect(freshWin.showInactive).toHaveBeenCalledTimes(1)
   })
 
   // -- Window configuration tests --
@@ -151,6 +153,17 @@ describe('ScreenEdgeGlowStrategy', () => {
     expect(mockWin.setAlwaysOnTop).toHaveBeenCalledWith(true, 'screen-saver')
   })
 
+  it('restores macOS dock icon after configuring workspace visibility', () => {
+    const originalPlatform = process.platform
+    Object.defineProperty(process, 'platform', { value: 'darwin' })
+
+    strategy.onReminderStart()
+
+    expect((app.dock as any).show).toHaveBeenCalled()
+
+    Object.defineProperty(process, 'platform', { value: originalPlatform })
+  })
+  
   it('loads a data URL with glow HTML', () => {
     strategy.onReminderStart()
 

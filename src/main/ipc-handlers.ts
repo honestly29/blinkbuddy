@@ -8,7 +8,7 @@
 
 import { ipcMain, type BrowserWindow } from 'electron'
 import { IPC_CHANNELS } from '../shared/ipc-messages'
-import type { StartArgs, SetPreviewArgs, UserSettings, SessionSummary, ReminderPreferences, StateUpdate } from '../shared/ipc-messages'
+import type { StartArgs, SetPreviewArgs, SetTwentyTwentyArgs, UserSettings, SessionSummary, ReminderPreferences, StateUpdate } from '../shared/ipc-messages'
 import type { PythonBridge } from './python-bridge'
 import type { SessionManager } from './session-manager'
 import type { SettingsStore } from './settings-store'
@@ -91,6 +91,7 @@ export function registerIpcHandlers(
   sessionLogger: SessionLogger,
   reminderPreferencesStore: ReminderPreferencesStore,
   reminderDispatcher: ReminderDispatcher,
+  twentyTwentyDispatcher: ReminderDispatcher,
 ): void {
 
   // Tracks currently-running test previews
@@ -128,6 +129,10 @@ export function registerIpcHandlers(
   ipcMain.handle(IPC_CHANNELS.SET_PREVIEW, (_event, args: SetPreviewArgs) => {
     // Send the command directly to the Python process via stdin.
     bridge.send({ type: 'set_preview', enabled: args.enabled })
+  })
+
+  ipcMain.handle(IPC_CHANNELS.SET_TWENTY_TWENTY, (_event, args: SetTwentyTwentyArgs) => {
+    sessionManager.setTwentyTwentyEnabled(args.enabled)
   })
 
   ipcMain.handle(
@@ -190,9 +195,16 @@ export function registerIpcHandlers(
 
     // Apply each strategy's new settings to the live dispatcher.
     applyStrategyPreference(reminderDispatcher, 'overlay', prefs.overlay.enabled, () => new OverlayReminderStrategy(), {})
+
     applyStrategyPreference(reminderDispatcher, 'screen-edge-glow', prefs.screenEdgeGlow.enabled, () => new ScreenEdgeGlowStrategy(), { colour: prefs.screenEdgeGlow.colour, opacity: prefs.screenEdgeGlow.opacity })
+
     applyStrategyPreference(reminderDispatcher, 'corner-popup', prefs.cornerPopup.enabled, () => new CornerPopupStrategy(), { corner: prefs.cornerPopup.corner })
+
     applyStrategyPreference(reminderDispatcher, 'audio-cue', prefs.audioCue.enabled, () => new AudioCueStrategy(), { soundFile: prefs.audioCue.soundFile, volume: prefs.audioCue.volume })
+
+    // The 20-20-20 break strategies inherit the corner/volume settings from the blink reminder preferences.
+    twentyTwentyDispatcher.getStrategy('twenty-twenty-popup')?.configure({ corner: prefs.cornerPopup.corner })
+    twentyTwentyDispatcher.getStrategy('twenty-twenty-audio')?.configure({ volume: prefs.audioCue.volume })
   })
 
   ipcMain.handle(IPC_CHANNELS.TEST_REMINDER, async (_event, strategyId: string) => {

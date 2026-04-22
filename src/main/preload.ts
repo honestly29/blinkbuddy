@@ -15,6 +15,7 @@ const api: BlinkBuddyAPI = {
   start: (args) => ipcRenderer.invoke(IPC_CHANNELS.START, args),
   stop: () => ipcRenderer.invoke(IPC_CHANNELS.STOP),
   setPreview: (args) => ipcRenderer.invoke(IPC_CHANNELS.SET_PREVIEW, args),
+  setTwentyTwenty: (args) => ipcRenderer.invoke(IPC_CHANNELS.SET_TWENTY_TWENTY, args),
   listCameras: () => ipcRenderer.invoke(IPC_CHANNELS.LIST_CAMERAS),
   getSessionHistory: () => ipcRenderer.invoke(IPC_CHANNELS.GET_SESSION_HISTORY),
   saveSettings: (settings) => ipcRenderer.invoke(IPC_CHANNELS.SAVE_SETTINGS, settings),

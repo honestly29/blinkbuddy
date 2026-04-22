@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { SessionManager, type BridgePort, type SessionConfig } from '../../src/main/session-manager'
+import { ReminderDispatcher } from '../../src/main/reminder-strategies/reminder-dispatcher'
+import type { ReminderStrategy } from '../../src/main/reminder-strategies/types'
 import type { PythonEvent } from '../../src/shared/protocol'
 import type { StateUpdate } from '../../src/shared/ipc-messages'
 
@@ -648,7 +650,7 @@ describe('SessionManager', () => {
     })
   })
 
-    // -----------------------------------------------------------------------
+  // -----------------------------------------------------------------------
   // Startup timeout
   // -----------------------------------------------------------------------
   describe('startup timeout', () => {
@@ -818,6 +820,502 @@ describe('SessionManager', () => {
 
       expect(sendToRenderer.mock.calls.length).toBe(1)
       expect(lastUpdate(sendToRenderer).error).toBe('Error!')
+    })
+  })
+
+  // -----------------------------------------------------------------------
+  // 20-20-20 break dispatcher + blink suppression
+  // -----------------------------------------------------------------------
+
+  describe('20-20-20 break dispatcher wiring', () => {
+    function createSpyStrategy(id: string): ReminderStrategy & {
+      onReminderStart: ReturnType<typeof vi.fn>
+      onReminderEnd: ReturnType<typeof vi.fn>
+      configure: ReturnType<typeof vi.fn>
+      dispose: ReturnType<typeof vi.fn>
+    } {
+      return {
+        id,
+        onReminderStart: vi.fn(),
+        onReminderEnd: vi.fn(),
+        configure: vi.fn(),
+        dispose: vi.fn(),
+      }
+    }
+
+    const TWENTY_MINUTES_MS = 20 * 60 * 1000
+    const BREAK_MS = 20 * 1000
+
+    let blinkStrategy: ReturnType<typeof createSpyStrategy>
+    let twentyTwentyStrategy: ReturnType<typeof createSpyStrategy>
+    let blinkDispatcher: ReminderDispatcher
+    let twentyTwentyDispatcher: ReminderDispatcher
+    let wiredManager: SessionManager
+
+    beforeEach(() => {
+      blinkStrategy = createSpyStrategy('overlay')
+      twentyTwentyStrategy = createSpyStrategy('twenty-twenty-popup')
+      blinkDispatcher = new ReminderDispatcher([blinkStrategy])
+      twentyTwentyDispatcher = new ReminderDispatcher([twentyTwentyStrategy])
+      wiredManager = new SessionManager({
+        bridge,
+        sendToRenderer,
+        throttleMs: 0,
+        reminderDispatcher: blinkDispatcher,
+        twentyTwentyDispatcher,
+      })
+    })
+
+    afterEach(() => {
+      if (wiredManager.isRunning()) {
+        wiredManager.stop()
+      }
+    })
+
+    it('fires onReminderStart on the 20-20-20 dispatcher when break begins', () => {
+      startWithConfirm(
+        wiredManager,
+        { ...DEFAULT_CONFIG, twentyTwentyEnabled: true, blinkWindowSeconds: 999 },
+        bridge,
+      )
+
+      vi.advanceTimersByTime(TWENTY_MINUTES_MS)
+
+      expect(twentyTwentyStrategy.onReminderStart).toHaveBeenCalledTimes(1)
+    })
+
+    it('fires onReminderEnd on the 20-20-20 dispatcher when break ends', () => {
+      startWithConfirm(
+        wiredManager,
+        { ...DEFAULT_CONFIG, twentyTwentyEnabled: true, blinkWindowSeconds: 999 },
+        bridge,
+      )
+
+      vi.advanceTimersByTime(TWENTY_MINUTES_MS) // break begins
+      twentyTwentyStrategy.onReminderEnd.mockClear()
+
+      vi.advanceTimersByTime(BREAK_MS) // break ends
+
+      expect(twentyTwentyStrategy.onReminderEnd).toHaveBeenCalledTimes(1)
+    })
+
+    it('suppresses blink reminder during the 20-20-20 break window', () => {
+      startWithConfirm(
+        wiredManager,
+        { ...DEFAULT_CONFIG, twentyTwentyEnabled: true, blinkWindowSeconds: 10 },
+        bridge,
+      )
+
+      // Blink window elapses long before the 20-minute mark → reminder active
+      vi.advanceTimersByTime(10_000)
+      expect(blinkStrategy.onReminderStart).toHaveBeenCalledTimes(1)
+      blinkStrategy.onReminderEnd.mockClear()
+
+      // Advance to break start — blink reminder must be deactivated
+      vi.advanceTimersByTime(TWENTY_MINUTES_MS - 10_000)
+
+      expect(twentyTwentyStrategy.onReminderStart).toHaveBeenCalledTimes(1)
+      expect(blinkStrategy.onReminderEnd).toHaveBeenCalledTimes(1)
+      expect(lastUpdate(sendToRenderer).shouldShowReminder).toBe(false)
+    })
+
+    it('resumes blink reminder after break ends if still overdue', () => {
+      startWithConfirm(
+        wiredManager,
+        { ...DEFAULT_CONFIG, twentyTwentyEnabled: true, blinkWindowSeconds: 10 },
+        bridge,
+      )
+
+      // Enter the break (blink reminder is already active, then suppressed)
+      vi.advanceTimersByTime(TWENTY_MINUTES_MS)
+      blinkStrategy.onReminderStart.mockClear()
+
+      // Break ends → blink reminder should re-fire on the next tick
+      vi.advanceTimersByTime(BREAK_MS)
+
+      expect(blinkStrategy.onReminderStart).toHaveBeenCalled()
+    })
+
+    it('ignores blink events from Python during break (no reminder edge)', () => {
+      startWithConfirm(
+        wiredManager,
+        { ...DEFAULT_CONFIG, twentyTwentyEnabled: true, blinkWindowSeconds: 10 },
+        bridge,
+      )
+
+      // Enter the break (reminder suppressed at this point)
+      vi.advanceTimersByTime(TWENTY_MINUTES_MS)
+      blinkStrategy.onReminderStart.mockClear()
+      blinkStrategy.onReminderEnd.mockClear()
+
+      // A blink arrives during the break — it should not toggle the reminder
+      vi.setSystemTime(TWENTY_MINUTES_MS + 5_000)
+      bridge.emit('event', blinkEvent(TWENTY_MINUTES_MS + 5_000))
+
+      expect(blinkStrategy.onReminderStart).not.toHaveBeenCalled()
+      expect(blinkStrategy.onReminderEnd).not.toHaveBeenCalled()
+    })
+
+    it('deactivates the 20-20-20 dispatcher on stop during an active break', () => {
+      startWithConfirm(
+        wiredManager,
+        { ...DEFAULT_CONFIG, twentyTwentyEnabled: true, blinkWindowSeconds: 999 },
+        bridge,
+      )
+
+      vi.advanceTimersByTime(TWENTY_MINUTES_MS)
+      expect(twentyTwentyStrategy.onReminderStart).toHaveBeenCalledTimes(1)
+
+      wiredManager.stop()
+
+      expect(twentyTwentyStrategy.onReminderEnd).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  // -----------------------------------------------------------------------
+  // 20-20-20 break dispatcher + blink suppression
+  // -----------------------------------------------------------------------
+
+  describe('20-20-20 break dispatcher wiring', () => {
+    // Inline factory for spy strategies
+    function createSpyStrategy(id: string): ReminderStrategy & {
+      onReminderStart: ReturnType<typeof vi.fn>
+      onReminderEnd: ReturnType<typeof vi.fn>
+      configure: ReturnType<typeof vi.fn>
+      dispose: ReturnType<typeof vi.fn>
+    } {
+      return {
+        id,
+        onReminderStart: vi.fn(),
+        onReminderEnd: vi.fn(),
+        configure: vi.fn(),
+        dispose: vi.fn(),
+      }
+    }
+
+    const TWENTY_MINUTES_MS = 20 * 60 * 1000
+    const BREAK_MS = 20 * 1000
+
+    let blinkStrategy: ReturnType<typeof createSpyStrategy>
+    let twentyTwentyStrategy: ReturnType<typeof createSpyStrategy>
+    let blinkDispatcher: ReminderDispatcher
+    let twentyTwentyDispatcher: ReminderDispatcher
+    let wiredManager: SessionManager
+
+    beforeEach(() => {
+      // Build a real SessionManager with real dispatchers holding spy strategies.
+      blinkStrategy = createSpyStrategy('overlay')
+      twentyTwentyStrategy = createSpyStrategy('twenty-twenty-popup')
+      blinkDispatcher = new ReminderDispatcher([blinkStrategy])
+      twentyTwentyDispatcher = new ReminderDispatcher([twentyTwentyStrategy])
+      wiredManager = new SessionManager({
+        bridge,
+        sendToRenderer,
+        throttleMs: 0,
+        reminderDispatcher: blinkDispatcher,
+        twentyTwentyDispatcher,
+      })
+    })
+
+    afterEach(() => {
+      if (wiredManager.isRunning()) {
+        wiredManager.stop()
+      }
+    })
+
+    it('fires onReminderStart on the 20-20-20 dispatcher when break begins', () => {
+      // blinkWindowSeconds:999 prevents a blink reminder from firing
+      // during the 20-minute wait
+      startWithConfirm(
+        wiredManager,
+        { ...DEFAULT_CONFIG, twentyTwentyEnabled: true, blinkWindowSeconds: 999 },
+        bridge,
+      )
+
+      vi.advanceTimersByTime(TWENTY_MINUTES_MS)
+
+      expect(twentyTwentyStrategy.onReminderStart).toHaveBeenCalledTimes(1)
+    })
+
+    it('fires onReminderEnd on the 20-20-20 dispatcher when break ends', () => {
+      startWithConfirm(
+        wiredManager,
+        { ...DEFAULT_CONFIG, twentyTwentyEnabled: true, blinkWindowSeconds: 999 },
+        bridge,
+      )
+
+      vi.advanceTimersByTime(TWENTY_MINUTES_MS) // break begins
+      twentyTwentyStrategy.onReminderEnd.mockClear()
+
+      vi.advanceTimersByTime(BREAK_MS) // break ends
+
+      expect(twentyTwentyStrategy.onReminderEnd).toHaveBeenCalledTimes(1)
+    })
+
+    it('suppresses blink reminder during the 20-20-20 break window', () => {
+      // Proves that when a break fires, the blink dispatcher gets 
+      // deactivated even if the blink window is already overdue.
+      startWithConfirm(
+        wiredManager,
+        { ...DEFAULT_CONFIG, twentyTwentyEnabled: true, blinkWindowSeconds: 10 },
+        bridge,
+      )
+
+      // Blink window elapses long before the 20-minute mark -> reminder active
+      vi.advanceTimersByTime(10_000)
+      expect(blinkStrategy.onReminderStart).toHaveBeenCalledTimes(1)
+      blinkStrategy.onReminderEnd.mockClear()
+
+      // Advance to break start - blink reminder must be deactivated
+      vi.advanceTimersByTime(TWENTY_MINUTES_MS - 10_000)
+
+      expect(twentyTwentyStrategy.onReminderStart).toHaveBeenCalledTimes(1)
+      expect(blinkStrategy.onReminderEnd).toHaveBeenCalledTimes(1)
+      expect(lastUpdate(sendToRenderer).shouldShowReminder).toBe(false)
+    })
+
+    it('resumes blink reminder after break ends if still overdue', () => {
+      startWithConfirm(
+        wiredManager,
+        { ...DEFAULT_CONFIG, twentyTwentyEnabled: true, blinkWindowSeconds: 10 },
+        bridge,
+      )
+
+      // Enter the break (blink reminder is already active, then suppressed)
+      vi.advanceTimersByTime(TWENTY_MINUTES_MS)
+      blinkStrategy.onReminderStart.mockClear()
+
+      // Break ends -> blink reminder should re-fire on the next tick
+      vi.advanceTimersByTime(BREAK_MS)
+
+      expect(blinkStrategy.onReminderStart).toHaveBeenCalled()
+    })
+
+    it('ignores blink events from Python during break (no reminder edge)', () => {
+      startWithConfirm(
+        wiredManager,
+        { ...DEFAULT_CONFIG, twentyTwentyEnabled: true, blinkWindowSeconds: 10 },
+        bridge,
+      )
+
+      // Enter the break (reminder suppressed at this point)
+      vi.advanceTimersByTime(TWENTY_MINUTES_MS)
+      blinkStrategy.onReminderStart.mockClear()
+      blinkStrategy.onReminderEnd.mockClear()
+
+      // A blink arrives during the break - it should not toggle the reminder
+      vi.setSystemTime(TWENTY_MINUTES_MS + 5_000)
+      bridge.emit('event', blinkEvent(TWENTY_MINUTES_MS + 5_000))
+
+      expect(blinkStrategy.onReminderStart).not.toHaveBeenCalled()
+      expect(blinkStrategy.onReminderEnd).not.toHaveBeenCalled()
+    })
+
+    it('deactivates the 20-20-20 dispatcher on stop during an active break', () => {
+      // Stopping mid-break must clean up the popup and play the end sound
+      startWithConfirm(
+        wiredManager,
+        { ...DEFAULT_CONFIG, twentyTwentyEnabled: true, blinkWindowSeconds: 999 },
+        bridge,
+      )
+
+      vi.advanceTimersByTime(TWENTY_MINUTES_MS)
+      expect(twentyTwentyStrategy.onReminderStart).toHaveBeenCalledTimes(1)
+
+      wiredManager.stop()
+
+      expect(twentyTwentyStrategy.onReminderEnd).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  // -----------------------------------------------------------------------
+  // Mid-session 20-20-20 toggle
+  // -----------------------------------------------------------------------
+
+  describe('mid-session 20-20-20 toggle', () => {
+    function createSpyStrategy(id: string, withCancel: boolean): ReminderStrategy & {
+      onReminderStart: ReturnType<typeof vi.fn>
+      onReminderEnd: ReturnType<typeof vi.fn>
+      onReminderCancel?: ReturnType<typeof vi.fn>
+      configure: ReturnType<typeof vi.fn>
+      dispose: ReturnType<typeof vi.fn>
+    } {
+      return {
+        id,
+        onReminderStart: vi.fn(),
+        onReminderEnd: vi.fn(),
+        ...(withCancel ? { onReminderCancel: vi.fn() } : {}),
+        configure: vi.fn(),
+        dispose: vi.fn(),
+      }
+    }
+
+    const TWENTY_MINUTES_MS = 20 * 60 * 1000
+
+    let popupStrategy: ReturnType<typeof createSpyStrategy>
+    let audioStrategy: ReturnType<typeof createSpyStrategy>
+    let twentyTwentyDispatcher: ReminderDispatcher
+    let wiredManager: SessionManager
+
+    beforeEach(() => {
+      popupStrategy = createSpyStrategy('twenty-twenty-popup', false)
+      audioStrategy = createSpyStrategy('twenty-twenty-audio', true)
+      twentyTwentyDispatcher = new ReminderDispatcher([popupStrategy, audioStrategy])
+      wiredManager = new SessionManager({
+        bridge,
+        sendToRenderer,
+        throttleMs: 0,
+        twentyTwentyDispatcher,
+      })
+    })
+
+    afterEach(() => {
+      if (wiredManager.isRunning()) {
+        wiredManager.stop()
+      }
+    })
+
+    it('is a no-op when not running', () => {
+      wiredManager.setTwentyTwentyEnabled(true)
+      wiredManager.setTwentyTwentyEnabled(false)
+
+      expect(popupStrategy.onReminderStart).not.toHaveBeenCalled()
+      expect(popupStrategy.onReminderEnd).not.toHaveBeenCalled()
+    })
+
+    it('enable from a disabled session starts a fresh 20-minute cycle', () => {
+      wiredManager.start({ ...DEFAULT_CONFIG, twentyTwentyEnabled: false })
+      expect(lastUpdate(sendToRenderer).twentyTwentyState.phase).toBe('idle')
+      sendToRenderer.mockClear()
+
+      wiredManager.setTwentyTwentyEnabled(true)
+
+      const update = lastUpdate(sendToRenderer)
+      expect(update.twentyTwentyState.phase).toBe('waiting')
+      expect(update.twentyTwentyState.timeUntilBreakMs).toBeGreaterThan(TWENTY_MINUTES_MS - 100)
+    })
+
+    it('enable does not reset the cycle if already waiting', () => {
+      startWithConfirm(wiredManager, { ...DEFAULT_CONFIG, twentyTwentyEnabled: true }, bridge)
+
+      // Advance 10 minutes into the cycle
+      vi.advanceTimersByTime(10 * 60 * 1000)
+      const beforeMs = lastUpdate(sendToRenderer).twentyTwentyState.timeUntilBreakMs
+
+      wiredManager.setTwentyTwentyEnabled(true)
+
+      const afterMs = lastUpdate(sendToRenderer).twentyTwentyState.timeUntilBreakMs
+      // Cycle was preserved - remaining time is still ~10 minutes (not ~20 as a reset would give)
+      expect(afterMs).toBe(beforeMs)
+      expect(afterMs).toBeLessThan(TWENTY_MINUTES_MS - 100)
+    })
+
+    it('disable during break_active silently cancels the popup and suppresses the end cue', () => {
+      startWithConfirm(
+        wiredManager,
+        { ...DEFAULT_CONFIG, twentyTwentyEnabled: true, blinkWindowSeconds: 999 },
+        bridge,
+      )
+
+      vi.advanceTimersByTime(TWENTY_MINUTES_MS) // enter break
+      expect(popupStrategy.onReminderStart).toHaveBeenCalledTimes(1)
+      popupStrategy.onReminderEnd.mockClear()
+      audioStrategy.onReminderEnd.mockClear()
+      audioStrategy.onReminderCancel?.mockClear()
+
+      wiredManager.setTwentyTwentyEnabled(false)
+
+      // Popup hides (via onReminderEnd - no cancel override for popup)
+      expect(popupStrategy.onReminderEnd).toHaveBeenCalledTimes(1)
+      // Audio cue is suppressed: onReminderCancel fires, onReminderEnd does NOT
+      expect(audioStrategy.onReminderCancel).toHaveBeenCalledTimes(1)
+      expect(audioStrategy.onReminderEnd).not.toHaveBeenCalled()
+      // Renderer sees the phase update
+      expect(lastUpdate(sendToRenderer).twentyTwentyState.phase).toBe('idle')
+    })
+
+    it('disable during waiting phase stops the timer with no dispatcher side effects', () => {
+      wiredManager.start({ ...DEFAULT_CONFIG, twentyTwentyEnabled: true })
+      sendToRenderer.mockClear()
+
+      wiredManager.setTwentyTwentyEnabled(false)
+
+      // Dispatcher wasn't active, so no strategy calls
+      expect(popupStrategy.onReminderStart).not.toHaveBeenCalled()
+      expect(popupStrategy.onReminderEnd).not.toHaveBeenCalled()
+      expect(audioStrategy.onReminderCancel).not.toHaveBeenCalled()
+      expect(lastUpdate(sendToRenderer).twentyTwentyState.phase).toBe('idle')
+    })
+
+    it('disable is no-op when already idle', () => {
+      wiredManager.start({ ...DEFAULT_CONFIG, twentyTwentyEnabled: false })
+      sendToRenderer.mockClear()
+
+      wiredManager.setTwentyTwentyEnabled(false)
+
+      // No state update should be pushed for the no-op
+      expect(sendToRenderer).not.toHaveBeenCalled()
+    })
+
+    it('disable + re-enable resets the cycle fresh, not residual time', () => {
+      startWithConfirm(
+        wiredManager,
+        { ...DEFAULT_CONFIG, twentyTwentyEnabled: true, blinkWindowSeconds: 999 },
+        bridge,
+      )
+
+      // Advance 15 minutes into the cycle
+      vi.advanceTimersByTime(15 * 60 * 1000)
+
+      // Disable then immediately re-enable
+      wiredManager.setTwentyTwentyEnabled(false)
+      wiredManager.setTwentyTwentyEnabled(true)
+
+      const update = lastUpdate(sendToRenderer)
+      expect(update.twentyTwentyState.phase).toBe('waiting')
+      // Full cycle restarts — timeUntilBreakMs is near 20 minutes, not ~5
+      expect(update.twentyTwentyState.timeUntilBreakMs).toBeGreaterThan(TWENTY_MINUTES_MS - 100)
+    })
+
+    it('blink reminder resumes on the next tick after a mid-break disable', () => {
+      const blinkStrategy: ReminderStrategy & {
+        onReminderStart: ReturnType<typeof vi.fn>
+        onReminderEnd: ReturnType<typeof vi.fn>
+        configure: ReturnType<typeof vi.fn>
+        dispose: ReturnType<typeof vi.fn>
+      } = {
+        id: 'overlay',
+        onReminderStart: vi.fn(),
+        onReminderEnd: vi.fn(),
+        configure: vi.fn(),
+        dispose: vi.fn(),
+      }
+      const blinkDispatcher = new ReminderDispatcher([blinkStrategy])
+      const manager = new SessionManager({
+        bridge,
+        sendToRenderer,
+        throttleMs: 0,
+        reminderDispatcher: blinkDispatcher,
+        twentyTwentyDispatcher,
+      })
+
+      startWithConfirm(
+        manager,
+        { ...DEFAULT_CONFIG, twentyTwentyEnabled: true, blinkWindowSeconds: 10 },
+        bridge,
+      )
+
+      // Blink window elapses during the 20-minute wait, then break begins and suppresses it
+      vi.advanceTimersByTime(TWENTY_MINUTES_MS)
+      blinkStrategy.onReminderStart.mockClear()
+
+      // Disable mid-break -> on the next tick, isBreakActive=false and blink should re-fire
+      manager.setTwentyTwentyEnabled(false)
+      vi.advanceTimersByTime(1000)
+
+      expect(blinkStrategy.onReminderStart).toHaveBeenCalled()
+
+      manager.stop()
     })
   })
 })

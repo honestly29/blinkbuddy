@@ -45,13 +45,13 @@ describe('SettingsPanel', () => {
     expect(input.disabled).toBe(true)
   })
 
-  it('disables 20-20-20 toggle when running', () => {
+  it('keeps 20-20-20 toggle clickable when running', () => {
     render(<SettingsPanel {...defaultProps} running={true} />)
     const buttons = screen.getAllByRole('button')
     const twentyTwentyButton = buttons.find(
       b => b.className.includes('rounded-full'),
     )
     expect(twentyTwentyButton).toBeDefined()
-    expect((twentyTwentyButton as HTMLButtonElement).disabled).toBe(true)
+    expect((twentyTwentyButton as HTMLButtonElement).disabled).toBe(false)
   })
 })

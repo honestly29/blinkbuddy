@@ -67,7 +67,6 @@ export function useSettings() {
     })
   }, [])
 
-  // Preview is the only setting that can change mid-session.
   const setPreviewEnabled = useCallback((enabled: boolean, running: boolean) => {
     setSettings(prev => {
       const next = { ...prev, previewEnabled: enabled }
@@ -79,12 +78,15 @@ export function useSettings() {
     }
   }, [])
 
-  const setTwentyTwentyEnabled = useCallback((enabled: boolean) => {
+  const setTwentyTwentyEnabled = useCallback((enabled: boolean, running: boolean) => {
     setSettings(prev => {
       const next = { ...prev, twentyTwentyEnabled: enabled }
       window.blinkBuddy.saveSettings(next)
       return next
     })
+    if (running) {
+      window.blinkBuddy.setTwentyTwenty({ enabled })
+    }
   }, [])
 
   // Re-fetch the camera list from the Python process.

@@ -10,6 +10,7 @@
 import type { TwentyTwentyPhase, TwentyTwentyState } from './types'
 
 const CYCLE_MS = 20 * 60 * 1000  // 20 minutes
+//const CYCLE_MS = 15 * 1000  // 15 seconds (for testing)
 const BREAK_MS = 20 * 1000       // 20 seconds
 
 export class TwentyTwentyTimer {
