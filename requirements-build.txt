@@ -1,0 +1,4 @@
+pyinstaller==6.6.0
+opencv-python-headless
+mediapipe>=0.10.14
+numpy

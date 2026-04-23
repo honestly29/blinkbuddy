@@ -4,6 +4,8 @@ import json
 import os
 import sys
 
+from python.paths import resource_path
+
 DEFAULTS = {
     "EAR_THRESHOLD": 0.21,
     "CONSEC_FRAMES": 2,
@@ -30,7 +32,7 @@ def load_config(path=None):
     config = dict(DEFAULTS)
 
     if path is None:
-        path = os.path.join(os.path.dirname(__file__), "detection_config.json")
+        path = resource_path("detection_config.json")
 
     if os.path.isfile(path):
         try:

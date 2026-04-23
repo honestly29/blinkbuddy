@@ -6,6 +6,7 @@ import numpy as np
 import mediapipe as mp
 
 from python.config import get_config
+from python.paths import resource_path
 
 # MediaPipe Face Mesh landmark indices for EAR computation.
 # Each eye has 6 landmarks: p1 (outer corner), p2 (upper-outer),
@@ -46,10 +47,7 @@ class FaceDetector:
 
     def __init__(self):
         config = get_config()
-        model_path = os.path.join(
-            os.path.dirname(__file__),
-            config["MODEL_PATH"],
-        )
+        model_path = resource_path(config["MODEL_PATH"])
 
         # Check that model file has been downloaded
         if not os.path.isfile(model_path):

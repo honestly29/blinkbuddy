@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "test": "vitest",
+    "build:python": "node scripts/build-python.mjs",
     "populate-test-data": "node scripts/populate-test-sessions.mjs"
   },
   "dependencies": {

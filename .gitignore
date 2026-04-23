@@ -3,6 +3,10 @@ dist/
 dist-electron/
 __pycache__/
 .venv/
+.venv-build/
 *.pyc
 .DS_Store
 python/models/
+python-dist/
+build/
+release/
