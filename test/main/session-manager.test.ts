@@ -253,7 +253,7 @@ describe('SessionManager', () => {
       )
     })
 
-    it('transitions OVERDUE → IDLE on blink', () => {
+    it('transitions OVERDUE -> IDLE on blink', () => {
       startWithConfirm(manager, DEFAULT_CONFIG, bridge)
 
       // Advance past the 10-second window to become overdue
@@ -286,7 +286,7 @@ describe('SessionManager', () => {
   // -----------------------------------------------------------------------
 
   describe('timer tick', () => {
-    it('transitions IDLE → OVERDUE when blink window expires', () => {
+    it('transitions IDLE -> OVERDUE when blink window expires', () => {
       startWithConfirm(manager, DEFAULT_CONFIG, bridge)
 
       // Advance exactly to the window boundary (10 seconds)
@@ -369,7 +369,7 @@ describe('SessionManager', () => {
       expect(update.faceDetected).toBe(false)
     })
 
-    it('transitions SUPPRESSED → IDLE when face is restored', () => {
+    it('transitions SUPPRESSED -> IDLE when face is restored', () => {
       manager.start(DEFAULT_CONFIG)
 
       // Lose face
@@ -598,33 +598,33 @@ describe('SessionManager', () => {
   // Full cycle integration
   // -----------------------------------------------------------------------
 
-  describe('full cycle: idle → overdue → idle (on blink)', () => {
-    it('completes the idle → overdue → idle cycle', () => {
+  describe('full cycle: idle -> overdue -> idle (on blink)', () => {
+    it('completes the idle -> overdue -> idle cycle', () => {
       startWithConfirm(manager, DEFAULT_CONFIG, bridge)
 
       // Initially idle
       expect(lastUpdate(sendToRenderer).reminderState).toBe('idle')
 
-      // Wait 10 seconds → overdue
+      // Wait 10 seconds -> overdue
       vi.advanceTimersByTime(10_000)
       expect(lastUpdate(sendToRenderer).reminderState).toBe('overdue')
       expect(lastUpdate(sendToRenderer).shouldShowReminder).toBe(true)
 
-      // Blink → back to idle
+      // Blink -> back to idle
       vi.setSystemTime(10_500)
       bridge.emit('event', blinkEvent(10_500))
       expect(lastUpdate(sendToRenderer).reminderState).toBe('idle')
       expect(lastUpdate(sendToRenderer).shouldShowReminder).toBe(false)
 
-      // Wait another 10 seconds from the blink → overdue again
+      // Wait another 10 seconds from the blink -> overdue again
       vi.advanceTimersByTime(10_000)
       expect(lastUpdate(sendToRenderer).reminderState).toBe('overdue')
       expect(lastUpdate(sendToRenderer).remindersTriggered).toBe(2)
     })
   })
 
-  describe('full cycle: idle → suppressed → idle with timer reset', () => {
-    it('completes the idle → suppressed → idle cycle', () => {
+  describe('full cycle: idle -> suppressed -> idle with timer reset', () => {
+    it('completes the idle -> suppressed -> idle cycle', () => {
       startWithConfirm(manager, DEFAULT_CONFIG, bridge)
 
       // Wait 5 seconds
@@ -644,11 +644,94 @@ describe('SessionManager', () => {
       bridge.emit('event', trackingEvent(true, 15_000))
       expect(lastUpdate(sendToRenderer).reminderState).toBe('idle')
 
-      // Now wait full window from reset point → overdue
+      // Now wait full window from reset point -> overdue
       vi.advanceTimersByTime(10_000)
       expect(lastUpdate(sendToRenderer).reminderState).toBe('overdue')
     })
   })
+
+
+   // -----------------------------------------------------------------------
+  // Cold-start clock behaviour 
+  // -----------------------------------------------------------------------
+
+  describe('cold-start clock', () => {
+    it('does not fire overdue before Python confirms running', () => {
+      manager.start(DEFAULT_CONFIG)
+      sendToRenderer.mockClear()
+
+      vi.advanceTimersByTime(25_000)
+
+      for (const call of sendToRenderer.mock.calls) {
+        const update = call[1] as StateUpdate
+        expect(update.reminderState).not.toBe('overdue')
+        expect(update.shouldShowReminder).toBe(false)
+      }
+    })
+
+    it('starts the blink clock on status:running, not on click', () => {
+      manager.start(DEFAULT_CONFIG)
+
+      // Python cold-imports for 15s before confirming.
+      vi.advanceTimersByTime(15_000)
+      vi.setSystemTime(15_000)
+      bridge.emit('event', { type: 'status', state: 'running' } as PythonEvent)
+
+      // 9s after confirmation - not overdue yet (clock started at 15s).
+      vi.advanceTimersByTime(9_000)
+      expect(lastUpdate(sendToRenderer).reminderState).toBe('idle')
+
+      // 10s after confirmation - now overdue.
+      vi.advanceTimersByTime(1_000)
+      expect(lastUpdate(sendToRenderer).reminderState).toBe('overdue')
+      expect(lastUpdate(sendToRenderer).shouldShowReminder).toBe(true)
+    })
+
+    it('falls back to starting the clock on first face-detected tracking event', () => {
+      // if status:running is somehow missed, the first
+      // positive tracking status should still anchor the clock.
+      manager.start(DEFAULT_CONFIG)
+
+      vi.advanceTimersByTime(8_000)
+      vi.setSystemTime(8_000)
+      bridge.emit('event', trackingEvent(true, 8_000))
+
+      vi.advanceTimersByTime(9_000)
+      expect(lastUpdate(sendToRenderer).reminderState).toBe('idle')
+
+      vi.advanceTimersByTime(1_000)
+      expect(lastUpdate(sendToRenderer).reminderState).toBe('overdue')
+    })
+
+    it('reproduces the original bug scenario and now fires overdue', () => {
+      // start, then cold-start delay, then
+      // MediaPipe warm-up yields tracking(false) -> tracking(true)
+      // before any overdue opportunity. Clock should start at
+      // status:running and only reset on the suppressed->idle transition
+      // if it was legitimately restarted.
+      manager.start(DEFAULT_CONFIG)
+
+      // Python confirms running at T=15s.
+      vi.advanceTimersByTime(15_000)
+      vi.setSystemTime(15_000)
+      bridge.emit('event', { type: 'status', state: 'running' } as PythonEvent)
+
+      // face lost then restored within ~1s.
+      vi.setSystemTime(15_200)
+      bridge.emit('event', trackingEvent(false, 15_200))
+      expect(lastUpdate(sendToRenderer).reminderState).toBe('suppressed')
+
+      vi.setSystemTime(16_000)
+      bridge.emit('event', trackingEvent(true, 16_000))
+      expect(lastUpdate(sendToRenderer).reminderState).toBe('idle')
+
+      // Overdue should fire ~10s after the suppressed->idle reset at T=16s,
+      vi.advanceTimersByTime(10_000) // now T=26s
+      expect(lastUpdate(sendToRenderer).reminderState).toBe('overdue')
+      expect(lastUpdate(sendToRenderer).shouldShowReminder).toBe(true)
+    })
+  })
+
 
   // -----------------------------------------------------------------------
   // Startup timeout
@@ -823,154 +906,6 @@ describe('SessionManager', () => {
     })
   })
 
-  // -----------------------------------------------------------------------
-  // 20-20-20 break dispatcher + blink suppression
-  // -----------------------------------------------------------------------
-
-  describe('20-20-20 break dispatcher wiring', () => {
-    function createSpyStrategy(id: string): ReminderStrategy & {
-      onReminderStart: ReturnType<typeof vi.fn>
-      onReminderEnd: ReturnType<typeof vi.fn>
-      configure: ReturnType<typeof vi.fn>
-      dispose: ReturnType<typeof vi.fn>
-    } {
-      return {
-        id,
-        onReminderStart: vi.fn(),
-        onReminderEnd: vi.fn(),
-        configure: vi.fn(),
-        dispose: vi.fn(),
-      }
-    }
-
-    const TWENTY_MINUTES_MS = 20 * 60 * 1000
-    const BREAK_MS = 20 * 1000
-
-    let blinkStrategy: ReturnType<typeof createSpyStrategy>
-    let twentyTwentyStrategy: ReturnType<typeof createSpyStrategy>
-    let blinkDispatcher: ReminderDispatcher
-    let twentyTwentyDispatcher: ReminderDispatcher
-    let wiredManager: SessionManager
-
-    beforeEach(() => {
-      blinkStrategy = createSpyStrategy('overlay')
-      twentyTwentyStrategy = createSpyStrategy('twenty-twenty-popup')
-      blinkDispatcher = new ReminderDispatcher([blinkStrategy])
-      twentyTwentyDispatcher = new ReminderDispatcher([twentyTwentyStrategy])
-      wiredManager = new SessionManager({
-        bridge,
-        sendToRenderer,
-        throttleMs: 0,
-        reminderDispatcher: blinkDispatcher,
-        twentyTwentyDispatcher,
-      })
-    })
-
-    afterEach(() => {
-      if (wiredManager.isRunning()) {
-        wiredManager.stop()
-      }
-    })
-
-    it('fires onReminderStart on the 20-20-20 dispatcher when break begins', () => {
-      startWithConfirm(
-        wiredManager,
-        { ...DEFAULT_CONFIG, twentyTwentyEnabled: true, blinkWindowSeconds: 999 },
-        bridge,
-      )
-
-      vi.advanceTimersByTime(TWENTY_MINUTES_MS)
-
-      expect(twentyTwentyStrategy.onReminderStart).toHaveBeenCalledTimes(1)
-    })
-
-    it('fires onReminderEnd on the 20-20-20 dispatcher when break ends', () => {
-      startWithConfirm(
-        wiredManager,
-        { ...DEFAULT_CONFIG, twentyTwentyEnabled: true, blinkWindowSeconds: 999 },
-        bridge,
-      )
-
-      vi.advanceTimersByTime(TWENTY_MINUTES_MS) // break begins
-      twentyTwentyStrategy.onReminderEnd.mockClear()
-
-      vi.advanceTimersByTime(BREAK_MS) // break ends
-
-      expect(twentyTwentyStrategy.onReminderEnd).toHaveBeenCalledTimes(1)
-    })
-
-    it('suppresses blink reminder during the 20-20-20 break window', () => {
-      startWithConfirm(
-        wiredManager,
-        { ...DEFAULT_CONFIG, twentyTwentyEnabled: true, blinkWindowSeconds: 10 },
-        bridge,
-      )
-
-      // Blink window elapses long before the 20-minute mark → reminder active
-      vi.advanceTimersByTime(10_000)
-      expect(blinkStrategy.onReminderStart).toHaveBeenCalledTimes(1)
-      blinkStrategy.onReminderEnd.mockClear()
-
-      // Advance to break start - blink reminder must be deactivated
-      vi.advanceTimersByTime(TWENTY_MINUTES_MS - 10_000)
-
-      expect(twentyTwentyStrategy.onReminderStart).toHaveBeenCalledTimes(1)
-      expect(blinkStrategy.onReminderEnd).toHaveBeenCalledTimes(1)
-      expect(lastUpdate(sendToRenderer).shouldShowReminder).toBe(false)
-    })
-
-    it('resumes blink reminder after break ends if still overdue', () => {
-      startWithConfirm(
-        wiredManager,
-        { ...DEFAULT_CONFIG, twentyTwentyEnabled: true, blinkWindowSeconds: 10 },
-        bridge,
-      )
-
-      // Enter the break (blink reminder is already active, then suppressed)
-      vi.advanceTimersByTime(TWENTY_MINUTES_MS)
-      blinkStrategy.onReminderStart.mockClear()
-
-      // Break ends → blink reminder should re-fire on the next tick
-      vi.advanceTimersByTime(BREAK_MS)
-
-      expect(blinkStrategy.onReminderStart).toHaveBeenCalled()
-    })
-
-    it('ignores blink events from Python during break (no reminder edge)', () => {
-      startWithConfirm(
-        wiredManager,
-        { ...DEFAULT_CONFIG, twentyTwentyEnabled: true, blinkWindowSeconds: 10 },
-        bridge,
-      )
-
-      // Enter the break (reminder suppressed at this point)
-      vi.advanceTimersByTime(TWENTY_MINUTES_MS)
-      blinkStrategy.onReminderStart.mockClear()
-      blinkStrategy.onReminderEnd.mockClear()
-
-      // A blink arrives during the break - it should not toggle the reminder
-      vi.setSystemTime(TWENTY_MINUTES_MS + 5_000)
-      bridge.emit('event', blinkEvent(TWENTY_MINUTES_MS + 5_000))
-
-      expect(blinkStrategy.onReminderStart).not.toHaveBeenCalled()
-      expect(blinkStrategy.onReminderEnd).not.toHaveBeenCalled()
-    })
-
-    it('deactivates the 20-20-20 dispatcher on stop during an active break', () => {
-      startWithConfirm(
-        wiredManager,
-        { ...DEFAULT_CONFIG, twentyTwentyEnabled: true, blinkWindowSeconds: 999 },
-        bridge,
-      )
-
-      vi.advanceTimersByTime(TWENTY_MINUTES_MS)
-      expect(twentyTwentyStrategy.onReminderStart).toHaveBeenCalledTimes(1)
-
-      wiredManager.stop()
-
-      expect(twentyTwentyStrategy.onReminderEnd).toHaveBeenCalledTimes(1)
-    })
-  })
 
   // -----------------------------------------------------------------------
   // 20-20-20 break dispatcher + blink suppression

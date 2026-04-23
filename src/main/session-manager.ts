@@ -128,7 +128,6 @@ export class SessionManager {
 
     // Reset all domain state for the new session
     this.blinkWindow = new BlinkWindow(config.blinkWindowSeconds)
-    this.blinkWindow.reset(now)
     this.blinkStats.reset()
     this.twentyTwenty.stop()
 
@@ -282,6 +281,9 @@ export class SessionManager {
       case 'status':
         if (event.state === 'running') {
           this.clearStartupTimeout()
+          if (!this.blinkWindow.isStarted()) {
+            this.blinkWindow.reset(Date.now())
+          }
         }
         break
       // preview_frame and camera_list events are forwarded directly
@@ -313,6 +315,11 @@ export class SessionManager {
   private handleTrackingStatus(faceDetected: boolean, timestamp: number): void {
     this.faceDetected = faceDetected
 
+    // Fallback if tracking arrives before `status:running` 
+    if (faceDetected && !this.blinkWindow.isStarted()) {
+      this.blinkWindow.reset(timestamp)
+    }
+
     // Tracking loss/gain affects reminder behaviour:
     // - Face lost: suppress reminders
     // - Face found: resume normal reminder logic
@@ -324,7 +331,6 @@ export class SessionManager {
 
     this.reminderState = result.state
     const isBreakActive = this.twentyTwenty.getPhase() === 'break_active' 
-    this.reminderDispatcher.update(result.shouldShowReminder)
     this.reminderDispatcher.update(!isBreakActive && result.shouldShowReminder) 
     if (result.shouldResetTimer) {
       this.blinkWindow.reset(timestamp)

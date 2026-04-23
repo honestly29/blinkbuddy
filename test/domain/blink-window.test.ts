@@ -36,16 +36,16 @@ describe('BlinkWindow', () => {
   it('recordBlink resets the overdue timer', () => {
     const start = 0
     window.reset(start)
-    // 15 seconds in — not overdue
+    // 15 seconds in - not overdue
     expect(window.isOverdue(15_000)).toBe(false)
 
     // Record a blink at 15s
     window.recordBlink(15_000)
 
-    // 10 seconds after blink (25s total) — not overdue (only 10s since last blink)
+    // 10 seconds after blink (25s total) - not overdue (only 10s since last blink)
     expect(window.isOverdue(25_000)).toBe(false)
 
-    // 20 seconds after blink (35s total) — overdue
+    // 20 seconds after blink (35s total) - overdue
     expect(window.isOverdue(35_000)).toBe(true)
   })
 
@@ -93,5 +93,25 @@ describe('BlinkWindow', () => {
   it('uses default window of 20 seconds', () => {
     const defaultWindow = new BlinkWindow()
     expect(defaultWindow.getWindowSeconds()).toBe(20)
+  })
+
+  it('isStarted is false on a freshly constructed window', () => {
+    expect(window.isStarted()).toBe(false)
+  })
+
+  it('isOverdue returns false on an unstarted window for any timestamp', () => {
+    expect(window.isOverdue(0)).toBe(false)
+    expect(window.isOverdue(1_000_000)).toBe(false)
+    expect(window.isOverdue(Number.MAX_SAFE_INTEGER)).toBe(false)
+  })
+
+  it('reset() starts the clock', () => {
+    window.reset(1000)
+    expect(window.isStarted()).toBe(true)
+  })
+
+  it('recordBlink() starts the clock', () => {
+    window.recordBlink(1000)
+    expect(window.isStarted()).toBe(true)
   })
 })
