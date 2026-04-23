@@ -25,6 +25,8 @@ export const IPC_CHANNELS = {
   GET_REMINDER_PREFERENCES: 'blink:get-reminder-preferences',
   UPDATE_REMINDER_PREFERENCES: 'blink:update-reminder-preferences',
   TEST_REMINDER: 'blink:test-reminder',
+  EXPORT_SESSIONS_CSV: 'blink:export-sessions-csv',     
+  CLEAR_SESSIONS: 'blink:clear-sessions',
   PYTHON_EVENT: 'blink:python-event',
   STATE_UPDATE: 'blink:state-update',
 } as const  
@@ -71,6 +73,17 @@ export interface UserSettings {
   twentyTwentyEnabled: boolean
 }
 
+export type ExportSessionsResult =
+  | { status: 'saved'; filePath: string }
+  | { status: 'cancelled' }
+  | { status: 'no-sessions' }
+  | { status: 'error'; message: string }
+
+export type ClearSessionsResult =
+  | { status: 'cleared' }
+  | { status: 'cancelled' }
+  | { status: 'error'; message: string }
+
 /** Summary of a completed monitoring session, persisted to sessions.json. */
 export interface SessionSummary {
   sessionStart: string    // ISO 8601 timestamp
@@ -109,7 +122,6 @@ export interface StateUpdate {
 
 /** The complete API surface available as window.blinkBuddy in the renderer. */
 export interface BlinkBuddyAPI {
-  // Command methods (request/response via ipcRenderer.invoke)
   start: (args?: StartArgs) => Promise<void>
   stop: () => Promise<void>
   setPreview: (args: SetPreviewArgs) => Promise<void>
@@ -121,7 +133,8 @@ export interface BlinkBuddyAPI {
   getReminderPreferences: () => Promise<ReminderPreferences>
   updateReminderPreferences: (prefs: ReminderPreferences) => Promise<void>
   testReminder: (strategyId: string) => Promise<void>
-  // Event subscription methods (push-based via ipcRenderer.on)
+   exportSessionsCsv: () => Promise<ExportSessionsResult>
+  clearSessions: () => Promise<ClearSessionsResult>
   onPythonEvent: (callback: (event: PythonEvent) => void) => () => void
   onStateUpdate: (callback: (state: StateUpdate) => void) => () => void
 }

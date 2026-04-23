@@ -8,6 +8,7 @@ import { SettingsPanel } from './components/SettingsPanel'
 import { StartStopControls } from './components/StartStopControls'
 import { ReminderOverlay } from './components/ReminderOverlay'
 import { ReminderSettingsPanel } from './components/ReminderSettingsPanel'
+import { DataManagementPanel } from './components/DataManagementPanel'
 import { CvsTipsPanel } from './components/CvsTipsPanel'
 import { SessionHistory } from './components/SessionHistory'
 import { TabBar } from './components/TabBar'
@@ -146,6 +147,8 @@ function App() {
               onTwentyTwentyChange={handleTwentyTwentyChange}
             />
             <ReminderSettingsPanel running={running} />
+
+            <DataManagementPanel />
           </>
         )}
       </main>

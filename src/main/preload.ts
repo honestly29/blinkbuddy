@@ -24,6 +24,9 @@ const api: BlinkBuddyAPI = {
   updateReminderPreferences: (prefs) => ipcRenderer.invoke(IPC_CHANNELS.UPDATE_REMINDER_PREFERENCES, prefs),
   testReminder: (strategyId) => ipcRenderer.invoke(IPC_CHANNELS.TEST_REMINDER, strategyId),
 
+  exportSessionsCsv: () => ipcRenderer.invoke(IPC_CHANNELS.EXPORT_SESSIONS_CSV),
+  clearSessions: () => ipcRenderer.invoke(IPC_CHANNELS.CLEAR_SESSIONS),
+
   // --- Event subscription methods ---
   // These use ipcRenderer.on() to listen for events pushed from the main process.
   // Each returns an unsubscribe function so the renderer can clean up listeners.

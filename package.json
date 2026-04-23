@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "vitest"
+    "test": "vitest",
+    "populate-test-data": "node scripts/populate-test-sessions.mjs"
   },
   "dependencies": {
     "electron": "^28.0.0",

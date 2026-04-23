@@ -81,4 +81,25 @@ describe('SessionLogger', () => {
     logger.append(summary)
     expect(logger.getAll()).toEqual([summary])
   })
+
+  describe('clear', () => {
+    it('empties the log file after sessions have been appended', () => {
+      logger.append(makeSummary())
+      logger.append(makeSummary({ totalBlinks: 80 }))
+
+      logger.clear()
+
+      expect(logger.getAll()).toEqual([])
+      const raw = fs.readFileSync(path.join(tmpDir, 'sessions.json'), 'utf-8')
+      expect(JSON.parse(raw)).toEqual([])
+    })
+
+    it('creates an empty log file when none exists', () => {
+      const filePath = path.join(tmpDir, 'sessions.json')
+      expect(fs.existsSync(filePath)).toBe(false)
+      expect(() => logger.clear()).not.toThrow()
+      expect(fs.existsSync(filePath)).toBe(true)
+      expect(logger.getAll()).toEqual([])
+    })
+  })
 })

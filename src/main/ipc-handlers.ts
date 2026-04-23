@@ -6,9 +6,21 @@
  * (defined in ipc-messages.ts) and is invoked by ipcRenderer.invoke() in the preload script.
  */
 
-import { ipcMain, type BrowserWindow } from 'electron'
+import { ipcMain, dialog, type BrowserWindow } from 'electron'
+import fs from 'node:fs/promises'
 import { IPC_CHANNELS } from '../shared/ipc-messages'
-import type { StartArgs, SetPreviewArgs, SetTwentyTwentyArgs, UserSettings, SessionSummary, ReminderPreferences, StateUpdate } from '../shared/ipc-messages'
+import type {
+  StartArgs,
+  SetPreviewArgs,
+  SetTwentyTwentyArgs,
+  UserSettings,
+  SessionSummary,
+  ReminderPreferences,
+  StateUpdate,
+  ExportSessionsResult,
+  ClearSessionsResult,
+} from '../shared/ipc-messages'
+import { buildSessionsCsv, defaultExportFilename } from './csv-export'
 import type { PythonBridge } from './python-bridge'
 import type { SessionManager } from './session-manager'
 import type { SettingsStore } from './settings-store'
@@ -269,6 +281,68 @@ export function registerIpcHandlers(
     }
   })
   
+  ipcMain.handle(IPC_CHANNELS.EXPORT_SESSIONS_CSV, async (): Promise<ExportSessionsResult> => {
+    // Read sessions before opening the dialog so we don't ask 
+    // the user where to save if there's nothing to export.
+    const sessions = sessionLogger.getAll()
+    if (sessions.length === 0) {
+      return { status: 'no-sessions' }
+    }
+
+    // If the main window is gone raise error rather than crash.
+    const win = getMainWindow()
+    if (!win || win.isDestroyed()) {
+      return { status: 'error', message: 'No window available' }
+    }
+
+    const result = await dialog.showSaveDialog(win, {
+      defaultPath: defaultExportFilename(),
+      // The filter restricts the file extension dropdown 
+      filters: [{ name: 'CSV', extensions: ['csv'] }],
+    })
+
+    if (result.canceled || !result.filePath) {
+      return { status: 'cancelled' }
+    }
+
+    try {
+      await fs.writeFile(result.filePath, buildSessionsCsv(sessions), 'utf-8')
+      return { status: 'saved', filePath: result.filePath }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      return { status: 'error', message }
+    }
+  })
+
+  ipcMain.handle(IPC_CHANNELS.CLEAR_SESSIONS, async (): Promise<ClearSessionsResult> => {
+    const win = getMainWindow()
+    if (!win || win.isDestroyed()) {
+      return { status: 'error', message: 'No window available' }
+    }
+
+    const { response } = await dialog.showMessageBox(win, {
+      type: 'warning',
+      buttons: ['Cancel', 'Clear'],
+      defaultId: 0,
+      cancelId: 0,
+      title: 'Clear all session data?',
+      message: 'This will permanently delete all logged sessions.',
+      detail: 'This action cannot be undone.',
+    })
+
+    if (response !== 1) {
+      return { status: 'cancelled' }
+    }
+
+    try {
+      sessionLogger.clear()
+      return { status: 'cleared' }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      return { status: 'error', message }
+    }
+  })
+
   // Forward Python events to the renderer
   bridge.on('event', (pythonEvent) => {
     const win = getMainWindow()
