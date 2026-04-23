@@ -99,7 +99,7 @@ class FaceDetector:
             }
 
        
-        # If face_landmarks is non-empty, the face passed MediaPipe's internal detection and presence thresholds.
+        # Hardcoded because MediaPipe's FaceLandmarker doesn't expose a per-frame quality score.
         quality = 1.0
 
         if quality < quality_threshold:
@@ -112,6 +112,7 @@ class FaceDetector:
 
         # Get the landmarks for the first (and only) detected face
         landmarks = result.face_landmarks[0]
+        # Compute EAR per eye then average
         ear_right = compute_ear(landmarks, RIGHT_EYE_INDICES)
         ear_left = compute_ear(landmarks, LEFT_EYE_INDICES)
         avg_ear = (ear_right + ear_left) / 2.0

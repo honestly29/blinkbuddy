@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 // Dev flag. 
 // Set false to disable 'wipe sessions' feature 
 // This is for any build going to participants in a study so they can't accidentally destroy their own data. 
-const ENABLE_CLEAR_DATA = false
+const ENABLE_CLEAR_DATA = true
 
 type Status =
   | { kind: 'idle' }
