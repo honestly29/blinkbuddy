@@ -8,20 +8,22 @@
  * and run `pip install` themselves. PyInstaller packages the Python code
  * plus all its dependencies into a single folder that can just be run.
  *
- * This script runs five steps in order:
+ * This script runs six steps in order:
  *   1. Make sure we have a Python environment with the build tools installed.
  *   2. Make sure the face detection model is downloaded.
  *   3. Delete any leftover files from previous builds.
- *   4. Run PyInstaller to create the bundle.
- *   5. Check that the output actually exists and is runnable.
+ *   4. Pre-build Matplotlib's font cache so users don't wait for it on first launch.
+ *   5. Run PyInstaller to create the bundle.
+ *   6. Check that the output actually exists and is runnable.
  */
+
 
 // spawnSync runs a command and waits for it to finish before moving on.
 // Each step has to succeed before the next one starts.
 import { spawnSync } from 'node:child_process'
 
 // Tools for checking if files exist, deleting folders, reading file sizes, and checking file permissions.
-import { existsSync, rmSync, statSync, constants as fsConstants, accessSync } from 'node:fs'
+import { existsSync, rmSync, statSync, constants as fsConstants, accessSync, mkdirSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
@@ -113,7 +115,42 @@ function cleanArtefacts() {
 
 
 /**
- * Step 4: Run PyInstaller to produce the bundle.
+ * Step 4: Pre-build the Matplotlib font cache so users don't wait for it on first launch.
+ *
+ * MediaPipe imports matplotlib internally, and matplotlib
+ * scans all the fonts on the computer the first time it's imported
+ * (takes 5-15 seconds) and saves the results to a fontlist file so
+ * future imports are fast. Without this step, every new user would
+ * wait ~15 seconds on first launch while matplotlib builds the cache,
+ * which is long enough to trip the Python startup timeout.
+ *
+ * So we build the cache once here at bundle time, ship it inside the
+ * app, and blinkbuddy_service.py copies it into place at startup.
+ */
+function prebuildMplFontCache() {
+  // Make a fresh empty folder to hold the cache. Putting it inside
+  // build/ means cleanArtefacts() wipes it on the next build.
+  const cacheDir = path.join(workDir, '.matplotlib-cache')
+  mkdirSync(cacheDir, { recursive: true })
+  console.log('Pre-building Matplotlib font cache ...')
+  // Run a Python command that just imports matplotlib.
+  // MPLCONFIGDIR env var tells matplotlib to write its cache into
+  // our folder instead of the user's ~/.matplotlib.
+  run(venvPython, ['-c', 'import matplotlib.pyplot'], {
+    env: { ...process.env, MPLCONFIGDIR: cacheDir },
+  })
+  // Check that matplotlib actually produced a fontlist file. The
+  // filename format is fontlist-v<N>.json where N is the version.
+  const produced = readdirSync(cacheDir).filter((f) => /^fontlist-v\d+\.json$/.test(f))
+  if (produced.length === 0) {
+    console.error(`Matplotlib did not produce a fontlist cache in ${cacheDir}`)
+    process.exit(1)
+  }
+  console.log(`✔ Pre-built Matplotlib font cache: ${produced.join(', ')}`)
+}
+
+/**
+ * Step 5: Run PyInstaller to produce the bundle.
  *
  * PyInstaller reads blinkbuddy-service.spec and produces 
  * the executable plus all its dependencies in
@@ -131,7 +168,7 @@ function runPyInstaller() {
 
 
 /**
- * Step 5: Double-check the output actually exists and works.
+ * Step 6: Double-check the output actually exists and works.
  *
  * If something went wrong silently earlier, we want to fail
  * loudly here rather than wait until Electron tries to run
@@ -158,9 +195,10 @@ function verifyOutput() {
   console.log(`[OK] Built ${outputBinary} (${sizeMb.toFixed(1)} MB launcher)`)
 }
 
-// Run all five steps in order.
+// Run all six steps in order.
 ensureBuildVenv()
 ensureModel()
 cleanArtefacts()
+prebuildMplFontCache()
 runPyInstaller()
 verifyOutput()

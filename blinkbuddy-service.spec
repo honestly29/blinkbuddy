@@ -3,11 +3,16 @@
 
 # PyInstaller executes this file as Python code at build time to
 # learn what to include in the bundle.
+import glob
 from PyInstaller.utils.hooks import collect_all
 
 # Run collect_all for both critical deps
 mediapipe_datas, mediapipe_binaries, mediapipe_hiddenimports = collect_all('mediapipe')
 numpy_datas, numpy_binaries, numpy_hiddenimports = collect_all('numpy')
+
+# Find the pre-built cache file from scripts/build-python.mjs
+# so first launch skips matplotlib's font scan.
+mpl_cache_datas = [(p, 'matplotlib-cache') for p in glob.glob('build/.matplotlib-cache/fontlist-v*.json')]
 
 # Analysis: the first pass - PyInstaller follows imports from the
 # entry script and decides what needs to go in the bundle.
@@ -15,11 +20,13 @@ a = Analysis(
     # Entry point
     ['blinkbuddy_service.py'],
     pathex=['.'],
+
     # Native library files (.dylib, .so) that must ship alongside
     # the Python code.
     binaries=mediapipe_binaries + numpy_binaries,
+
     # Non-Python data files to bundle.
-    datas=mediapipe_datas + numpy_datas + [
+    datas=mediapipe_datas + numpy_datas + mpl_cache_datas + [
         ('python/models/face_landmarker_v2.task', 'models'),
     ],
     hiddenimports=mediapipe_hiddenimports + numpy_hiddenimports + [
@@ -30,6 +37,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
+
     # Drop the legacy MediaPipe Solutions API because we only use
     # the newer Tasks API
     excludes=['mediapipe.python.solutions'],

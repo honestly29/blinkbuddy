@@ -15,32 +15,41 @@ export interface PythonBridgeEvents {
   exit: [code: number | null, signal: string | null]
 }
 
+export interface PythonBridgeOptions {
+  isPackaged: boolean
+  resourcesPath: string
+  projectRoot: string
+}
+
 export class PythonBridge extends EventEmitter<PythonBridgeEvents> {
   private process: ChildProcess | null = null
   private readline: Interface | null = null
-  private pythonPath: string
-  private scriptPath: string
+  private options: PythonBridgeOptions
 
-  constructor() {
+  constructor(options: PythonBridgeOptions) {
     super()
-    // Resolve paths relative to the project root.
-    // In development, __dirname is dist-electron/ so we go one level up.
-    const projectRoot = path.join(__dirname, '..')
-    this.pythonPath = path.join(projectRoot, '.venv', 'bin', 'python')
-    this.scriptPath = path.join(projectRoot, 'python', 'main.py')
+    this.options = options
   }
 
   /**
    * Spawn the Python child process.
-   * Safe to call multiple times — will no-op if already running.
+   * Safe to call multiple times - will no-op if already running.
    */
   spawn(): void {
     if (this.process) return
 
-    this.process = spawn(this.pythonPath, ['-m', 'python.main'], {
-      cwd: path.join(__dirname, '..'),
-      stdio: ['pipe', 'pipe', 'pipe'],
-    })
+    if (this.options.isPackaged) {
+      // Packaged mode: spawn the standalone binary we built with PyInstaller
+      const binary = path.join(this.options.resourcesPath, 'python-service', 'blinkbuddy-service')
+      this.process = spawn(binary, [], { stdio: ['pipe', 'pipe', 'pipe'] })
+    } else {
+      // Dev mode: run the Python source directly using our .venv.
+      const py = path.join(this.options.projectRoot, '.venv', 'bin', 'python')
+      this.process = spawn(py, ['-m', 'python.main'], {
+        cwd: this.options.projectRoot,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      })
+    }
 
     // Parse stdout as JSON Lines
     this.readline = createInterface({ input: this.process.stdout! })
@@ -78,7 +87,7 @@ export class PythonBridge extends EventEmitter<PythonBridgeEvents> {
    */
   send(command: PythonCommand): void {
     if (!this.process?.stdin?.writable) {
-      console.error('[PythonBridge] Cannot send — process not running')
+      console.error('[PythonBridge] Cannot send - process not running')
       return
     }
     const line = JSON.stringify(command) + '\n'

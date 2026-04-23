@@ -161,12 +161,12 @@ export class SessionManager {
       this.lastTwentyTwentyState = { ...IDLE_TWENTY_TWENTY }
     }
 
-    // Set a 10-second startup timeout. If Python doesn't emit
+    // Set a 30-second startup timeout. If Python doesn't emit
     // "status: running" within this window, we assume it failed silently
     this.startupTimeout = setTimeout(() => {
       this.teardown()
       this.sendStateNow('Could not start detection service')
-    }, 10_000)
+    }, 30_000)
 
     // Begin 1-second interval tick for overdue checks and 20-20-20 ticks
     this.tickInterval = setInterval(() => this.tick(), 1000)

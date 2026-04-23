@@ -185,7 +185,7 @@ describe('SessionManager', () => {
       manager.stop()
       sendToRenderer.mockClear()
 
-      // Advance time — no more ticks should fire
+      // Advance time - no more ticks should fire
       vi.advanceTimersByTime(5000)
 
       expect(sendToRenderer).not.toHaveBeenCalled()
@@ -300,7 +300,7 @@ describe('SessionManager', () => {
     it('stays IDLE before the window expires', () => {
       startWithConfirm(manager, DEFAULT_CONFIG, bridge)
 
-      // Advance 9 seconds — not yet overdue
+      // Advance 9 seconds - not yet overdue
       vi.advanceTimersByTime(9000)
 
       const update = lastUpdate(sendToRenderer)
@@ -396,17 +396,17 @@ describe('SessionManager', () => {
       bridge.emit('event', trackingEvent(false, 8000))
       expect(lastUpdate(sendToRenderer).reminderState).toBe('suppressed')
 
-      // Restore face at t=9000 — timer should reset from this point
+      // Restore face at t=9000 - timer should reset from this point
       vi.setSystemTime(9000)
       bridge.emit('event', trackingEvent(true, 9000))
       expect(lastUpdate(sendToRenderer).reminderState).toBe('idle')
 
-      // Advance 9 more seconds (t=18000) — should NOT be overdue yet
+      // Advance 9 more seconds (t=18000) - should NOT be overdue yet
       // because timer was reset at t=9000
       vi.advanceTimersByTime(9000)
       expect(lastUpdate(sendToRenderer).reminderState).toBe('idle')
 
-      // Advance 1 more second (t=19000) — NOW overdue (10s since reset at t=9000)
+      // Advance 1 more second (t=19000) - NOW overdue (10s since reset at t=9000)
       vi.advanceTimersByTime(1000)
       expect(lastUpdate(sendToRenderer).reminderState).toBe('overdue')
     })
@@ -419,7 +419,7 @@ describe('SessionManager', () => {
       expect(lastUpdate(sendToRenderer).reminderState).toBe('overdue')
       expect(lastUpdate(sendToRenderer).shouldShowReminder).toBe(true)
 
-      // Lose face — should suppress
+      // Lose face - should suppress
       bridge.emit('event', trackingEvent(false, 10_000))
 
       const update = lastUpdate(sendToRenderer)
@@ -493,7 +493,7 @@ describe('SessionManager', () => {
     })
 
     it('ignores errors when not running', () => {
-      // Not started — error should be ignored
+      // Not started - error should be ignored
       bridge.emit('error', new Error('irrelevant'))
 
       expect(sendToRenderer).not.toHaveBeenCalled()
@@ -635,11 +635,11 @@ describe('SessionManager', () => {
       bridge.emit('event', trackingEvent(false, 5000))
       expect(lastUpdate(sendToRenderer).reminderState).toBe('suppressed')
 
-      // Wait 10 seconds with no face — should stay suppressed (not overdue)
+      // Wait 10 seconds with no face - should stay suppressed (not overdue)
       vi.advanceTimersByTime(10_000)
       expect(lastUpdate(sendToRenderer).reminderState).toBe('suppressed')
 
-      // Restore face at t=15000 — timer resets
+      // Restore face at t=15000 - timer resets
       vi.setSystemTime(15_000)
       bridge.emit('event', trackingEvent(true, 15_000))
       expect(lastUpdate(sendToRenderer).reminderState).toBe('idle')
@@ -654,11 +654,11 @@ describe('SessionManager', () => {
   // Startup timeout
   // -----------------------------------------------------------------------
   describe('startup timeout', () => {
-    it('fires error after 10s with no status:running confirmation', () => {
+    it('fires error after 30s with no status:running confirmation', () => {
       // Use start() (NOT startWithConfirm) to leave the timeout active
       manager.start(DEFAULT_CONFIG)
 
-      vi.advanceTimersByTime(10_000)
+      vi.advanceTimersByTime(30_000)
 
       expect(manager.isRunning()).toBe(false)
       const update = lastUpdate(sendToRenderer)
@@ -670,7 +670,7 @@ describe('SessionManager', () => {
       // Confirm startup, which clears the timeout
       startWithConfirm(manager, DEFAULT_CONFIG, bridge)
 
-      // Advance past 10s — should NOT trigger timeout
+      // Advance past 10s - should NOT trigger timeout
       vi.advanceTimersByTime(9000)
 
       expect(manager.isRunning()).toBe(true)
@@ -682,7 +682,7 @@ describe('SessionManager', () => {
       manager.stop()  // User stops before Python confirms
       sendToRenderer.mockClear()
 
-      // Advance past 10s — should NOT trigger timeout
+      // Advance past 10s - should NOT trigger timeout
       vi.advanceTimersByTime(10_000)
 
       // No extra state pushes (timeout was cleared by stop())
@@ -911,7 +911,7 @@ describe('SessionManager', () => {
       expect(blinkStrategy.onReminderStart).toHaveBeenCalledTimes(1)
       blinkStrategy.onReminderEnd.mockClear()
 
-      // Advance to break start — blink reminder must be deactivated
+      // Advance to break start - blink reminder must be deactivated
       vi.advanceTimersByTime(TWENTY_MINUTES_MS - 10_000)
 
       expect(twentyTwentyStrategy.onReminderStart).toHaveBeenCalledTimes(1)
@@ -948,7 +948,7 @@ describe('SessionManager', () => {
       blinkStrategy.onReminderStart.mockClear()
       blinkStrategy.onReminderEnd.mockClear()
 
-      // A blink arrives during the break — it should not toggle the reminder
+      // A blink arrives during the break - it should not toggle the reminder
       vi.setSystemTime(TWENTY_MINUTES_MS + 5_000)
       bridge.emit('event', blinkEvent(TWENTY_MINUTES_MS + 5_000))
 
@@ -1273,7 +1273,7 @@ describe('SessionManager', () => {
 
       const update = lastUpdate(sendToRenderer)
       expect(update.twentyTwentyState.phase).toBe('waiting')
-      // Full cycle restarts — timeUntilBreakMs is near 20 minutes, not ~5
+      // Full cycle restarts - timeUntilBreakMs is near 20 minutes, not ~5
       expect(update.twentyTwentyState.timeUntilBreakMs).toBeGreaterThan(TWENTY_MINUTES_MS - 100)
     })
 

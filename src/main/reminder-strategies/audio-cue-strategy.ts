@@ -24,6 +24,8 @@ export class AudioCueStrategy implements ReminderStrategy {
   private pendingPlay = false
   private soundFile = 'dragon-studio-ding.mp3'
   private volume = 0.5
+  // Flipped to true if the sound file can't be loaded.
+  private failed = false
 
   onReminderStart(): void {
     this.ensureWindow()
@@ -74,6 +76,7 @@ export class AudioCueStrategy implements ReminderStrategy {
     this.window = null
     this.ready = false
     this.pendingPlay = false
+    this.failed = false
   }
 
   private play(): void {
@@ -87,13 +90,27 @@ export class AudioCueStrategy implements ReminderStrategy {
     if (this.window && !this.window.isDestroyed()) {
       return
     }
+    // Early exit if a previous load failed
+    if (this.failed) {
+      return
+    }
 
     this.ready = false
 
     // Read the sound file from disk and embed it directly into the HTML as a base64 data URL.
     const soundPath = path.join(app.getAppPath(), 'src', 'main', 'assets', 'sounds', this.soundFile)
-    const soundData = fs.readFileSync(soundPath)
-    const base64 = soundData.toString('base64')
+    let base64: string
+    try {
+      base64 = fs.readFileSync(soundPath).toString('base64')
+    } catch (err) {
+      // File missing, unreadable, or any other I/O error. 
+      // Mark as failed, clear any queued playback, and log one warning.
+      // The app keeps running - the user just won't hear audio cues.
+      this.failed = true
+      this.pendingPlay = false
+      console.warn(`[AudioCueStrategy] Failed to load sound "${this.soundFile}" from ${soundPath}; audio cues disabled.`, err)
+      return
+    }
 
     // The volume assignment at the top of the <script> tag sets the current volume as soon as the page loads. 
     const html = `<!DOCTYPE html>

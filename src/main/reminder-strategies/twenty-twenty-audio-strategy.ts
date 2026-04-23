@@ -17,6 +17,7 @@ export class TwentyTwentyAudioStrategy implements ReminderStrategy {
   // Holds the single most recent cue requested before the page is ready.
   private pendingPlay: PendingCue = null
   private volume = DEFAULT_VOLUME
+  private failed = false
 
   onReminderStart(): void {
     this.ensureWindow()
@@ -70,6 +71,7 @@ export class TwentyTwentyAudioStrategy implements ReminderStrategy {
     this.window = null
     this.ready = false
     this.pendingPlay = null
+    this.failed = false
   }
 
   /** Trigger the hidden audio page to play the start or end audio cue. */
@@ -84,13 +86,25 @@ export class TwentyTwentyAudioStrategy implements ReminderStrategy {
     if (this.window && !this.window.isDestroyed()) {
       return
     }
+    if (this.failed) {
+      return
+    }
 
     this.ready = false
 
     // Load both sounds off disk once and embed them as base64 data URIs.
     const soundsDir = path.join(app.getAppPath(), 'src', 'main', 'assets', 'sounds')
-    const startBase64 = fs.readFileSync(path.join(soundsDir, START_SOUND_FILE)).toString('base64')
-    const endBase64 = fs.readFileSync(path.join(soundsDir, END_SOUND_FILE)).toString('base64')
+    let startBase64: string
+    let endBase64: string
+    try {
+      startBase64 = fs.readFileSync(path.join(soundsDir, START_SOUND_FILE)).toString('base64')
+      endBase64 = fs.readFileSync(path.join(soundsDir, END_SOUND_FILE)).toString('base64')
+    } catch (err) {
+      this.failed = true
+      this.pendingPlay = null
+      console.warn(`[TwentyTwentyAudioStrategy] Failed to load break sounds from ${soundsDir}; 20-20-20 audio cues disabled.`, err)
+      return
+    }
 
     const html = `<!DOCTYPE html>
 <html><body>

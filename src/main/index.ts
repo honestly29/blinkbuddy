@@ -43,7 +43,14 @@ function createWindow() {
 
 app.whenReady().then(() => {
   // Create and spawn the Python bridge
-  pythonBridge = new PythonBridge()
+  pythonBridge = new PythonBridge({
+    // false when running via `npm run dev`, true when running from inside a .dmg
+    isPackaged: app.isPackaged,       
+    // Contents/Resources/ path - only meaningful in packaged mode.
+    resourcesPath: process.resourcesPath, 
+    // Repo root - only meaningful in dev mode.
+    projectRoot: path.join(__dirname, '..'),
+  })
   pythonBridge.spawn()
 
   // -- Load reminder preferences and build the strategy list --

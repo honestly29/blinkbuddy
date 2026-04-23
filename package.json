@@ -8,10 +8,46 @@
     "build": "vite build",
     "test": "vitest",
     "build:python": "node scripts/build-python.mjs",
+    "build:renderer": "vite build",
+    "build:electron": "electron-builder",
+    "dist": "npm run build:python && npm run build:renderer && npm run build:electron",
     "populate-test-data": "node scripts/populate-test-sessions.mjs"
   },
+  "build": {
+    "appId": "com.blinkbuddy.app",
+    "productName": "BlinkBuddy",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**",
+      "dist-electron/**",
+      "package.json",
+      "src/main/assets/**",
+      "!python/**",
+      "!python-dist/**",
+      "!.venv/**",
+      "!.venv-build/**",
+      "!scripts/**",
+      "!test/**"
+    ],
+    "extraResources": [
+      {
+        "from": "python-dist/blinkbuddy-service",
+        "to": "python-service"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.healthcare-fitness",
+      "target": "dmg",
+      "identity": null,
+      "extendInfo": {
+        "NSCameraUsageDescription": "BlinkBuddy uses your camera to count blinks on-device. No video leaves your Mac."
+      }
+    }
+  },
   "dependencies": {
-    "electron": "^28.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
@@ -22,6 +58,7 @@
     "@types/react-dom": "^18.2.0",
     "@vitejs/plugin-react": "^4.2.0",
     "autoprefixer": "^10.4.17",
+    "electron": "^28.0.0",
     "electron-builder": "^24.9.0",
     "jsdom": "^24.1.3",
     "postcss": "^8.4.33",
