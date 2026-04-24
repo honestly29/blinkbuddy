@@ -204,7 +204,7 @@ BlinkBuddy is a modular monolith: a single desktop application with clearly sepa
 ## Project structure
 
 ```
-fyp/
+blinkbuddy/
 ├── blinkbuddy_service.py          # PyInstaller entry shim
 ├── blinkbuddy-service.spec        # PyInstaller build spec
 ├── index.html                     # Vite entry point
