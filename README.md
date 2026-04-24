@@ -24,7 +24,7 @@ BlinkBuddy uses real-time facial landmark detection to track blink frequency dur
 
 ### Step 1: Install
 
-1. Download `BlinkBuddy-0.1.0-arm64.dmg` 
+1. Download `BlinkBuddy-0.1.0-arm64.dmg` from the [latest release](https://github.com/honestly29/blinkbuddy/releases/latest) on GitHub.
 2. Double-click the `.dmg` file.
 3. Drag `BlinkBuddy` into the Applications folder.
 4. Close the `.dmg` window.
