@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
-import { SessionHistory } from '../../../src/renderer/components/SessionHistory'
+import { SessionHistory, formatSessionTime } from '../../../src/renderer/components/SessionHistory'
 import type { SessionSummary } from '../../../src/shared/ipc-messages'
 
 const mockGetSessionHistory = vi.fn()
@@ -46,6 +46,40 @@ beforeEach(() => {
 afterEach(() => {
   // @ts-expect-error cleanup
   delete window.blinkBuddy
+})
+
+describe('formatSessionTime', () => {
+  function at(hour: number, minute: number): string {
+    return new Date(2026, 0, 15, hour, minute).toISOString()
+  }
+
+  it('formats midnight as 12:00 am', () => {
+    expect(formatSessionTime(at(0, 0))).toBe('12:00 am')
+  })
+
+  it('formats 00:30 as 12:30 am', () => {
+    expect(formatSessionTime(at(0, 30))).toBe('12:30 am')
+  })
+
+  it('formats 11:59 as 11:59 am', () => {
+    expect(formatSessionTime(at(11, 59))).toBe('11:59 am')
+  })
+
+  it('formats noon as 12:00 pm', () => {
+    expect(formatSessionTime(at(12, 0))).toBe('12:00 pm')
+  })
+
+  it('formats 12:02 as 12:02 pm', () => {
+    expect(formatSessionTime(at(12, 2))).toBe('12:02 pm')
+  })
+
+  it('formats 13:00 as 1:00 pm', () => {
+    expect(formatSessionTime(at(13, 0))).toBe('1:00 pm')
+  })
+
+  it('formats 23:45 as 11:45 pm', () => {
+    expect(formatSessionTime(at(23, 45))).toBe('11:45 pm')
+  })
 })
 
 describe('SessionHistory', () => {

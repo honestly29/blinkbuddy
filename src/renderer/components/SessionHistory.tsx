@@ -324,12 +324,13 @@ function BlinkRateChart({ sessions }: { sessions: SessionSummary[] }) {
 // ---------------------------------------------------------------------------
 
 // Time-only formatter for session rows.
-function formatSessionTime(isoString: string): string {
-  return new Date(isoString).toLocaleTimeString(undefined, {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  })
+export function formatSessionTime(isoString: string): string {
+  const d = new Date(isoString)
+  const hours24 = d.getHours()
+  const hour12 = hours24 % 12 || 12
+  const minutes = String(d.getMinutes()).padStart(2, '0')
+  const suffix = hours24 < 12 ? 'am' : 'pm'
+  return `${hour12}:${minutes} ${suffix}`
 }
 
 // Day-header formatter: "Today", "Yesterday", or a date like "31 March"
