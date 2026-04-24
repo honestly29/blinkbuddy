@@ -15,6 +15,8 @@ type Listener = (...args: any[]) => void
 class MockBridge implements BridgePort {
   private listeners = new Map<string, Set<Listener>>()
   send = vi.fn()
+  kill = vi.fn(async () => {})
+  spawn = vi.fn()
 
   on(event: string, listener: Listener): this {
     if (!this.listeners.has(event)) {
@@ -737,16 +739,19 @@ describe('SessionManager', () => {
   // Startup timeout
   // -----------------------------------------------------------------------
   describe('startup timeout', () => {
-    it('fires error after 30s with no status:running confirmation', () => {
-      // Use start() (NOT startWithConfirm) to leave the timeout active
+    it('fires error after 45s with no status:running confirmation and respawns Python', async () => {
       manager.start(DEFAULT_CONFIG)
 
-      vi.advanceTimersByTime(30_000)
+      // Fast-forward 45s and wait for the kill/spawn recovery to finish
+    // before we check the results.
+      await vi.advanceTimersByTimeAsync(45_000)
 
       expect(manager.isRunning()).toBe(false)
       const update = lastUpdate(sendToRenderer)
       expect(update.running).toBe(false)
       expect(update.error).toBe('Could not start detection service')
+      expect(bridge.kill).toHaveBeenCalledTimes(1)
+      expect(bridge.spawn).toHaveBeenCalledTimes(1)
     })
 
     it('clears on status:running confirmation', () => {

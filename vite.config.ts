@@ -19,4 +19,22 @@ export default defineConfig({
     ]),
     renderer(),
   ],
+  server: {
+    watch: {
+      // Don't watch build-output folders. They contain thousands of
+      // files that Vite mistakes for source code, triggering reloads
+      // that restart Electron and break the dev environment. These
+      // entries are added to Vite's default ignores (node_modules,
+      // .git), not replacing them.
+      ignored: [
+        '**/.venv/**',
+        '**/.venv-build/**',
+        '**/build/**',
+        '**/dist/**',
+        '**/dist-electron/**',
+        '**/python-dist/**',
+        '**/release/**',
+      ],
+    },
+  },
 })

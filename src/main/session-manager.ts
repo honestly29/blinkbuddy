@@ -36,6 +36,8 @@ export interface BridgePort {
   removeListener(event: 'error', listener: (error: Error) => void): this
   removeListener(event: 'exit', listener: (code: number | null, signal: string | null) => void): this
   send(command: PythonCommand): void
+  kill(): Promise<void>
+  spawn(): void
 }
 
 export interface SessionConfig {
@@ -88,8 +90,7 @@ export class SessionManager {
   private lastTwentyTwentyState: TwentyTwentyState = { ...IDLE_TWENTY_TWENTY }
   private twentyTwentyBreaksTaken = 0
 
-  // Startup timeout handle. Fires after 10 seconds if Python hasn't
-  // confirmed "status: running".
+  // Startup timeout (45 seconds)
   private startupTimeout: ReturnType<typeof setTimeout> | null = null
 
   private lastPushTime = 0
@@ -160,12 +161,19 @@ export class SessionManager {
       this.lastTwentyTwentyState = { ...IDLE_TWENTY_TWENTY }
     }
 
-    // Set a 30-second startup timeout. If Python doesn't emit
-    // "status: running" within this window, we assume it failed silently
-    this.startupTimeout = setTimeout(() => {
+    // Set a 45-second startup timeout. If Python doesn't emit
+    // "status: running" within this window, we assume it failed
+    this.startupTimeout = setTimeout(async () => {
+      //If Python is stuck inside camera.open() when this fires, kill + respawn the subprocess
       this.teardown()
       this.sendStateNow('Could not start detection service')
-    }, 30_000)
+      try {
+        await this.bridge.kill()
+        this.bridge.spawn()
+      } catch (err) {
+        console.error('[SessionManager] Python respawn after startup timeout failed:', err)
+      }
+    }, 45_000)
 
     // Begin 1-second interval tick for overdue checks and 20-20-20 ticks
     this.tickInterval = setInterval(() => this.tick(), 1000)
