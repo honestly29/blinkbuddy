@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { useReminderPreferences } from '../hooks/useReminderPreferences'
 import type { ReminderPreferences, CornerPosition } from '../../shared/ipc-messages'
 
@@ -16,14 +17,31 @@ const CORNERS: { value: CornerPosition; label: string }[] = [
   { value: 'bottom-right', label: '\u2198' },
 ]
 
-// Toggle switch button
-function ToggleSwitch({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+function Tooltip({ children }: { children: ReactNode }) {
   return (
+    <span className="pointer-events-none absolute -top-9 right-0 z-10 whitespace-nowrap rounded-md border border-gray-700 bg-gray-900 px-2 py-1 text-xs text-gray-100 opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+      {children}
+    </span>
+  )
+}
+
+// Toggle switch button
+function ToggleSwitch({
+  value,
+  onChange,
+  locked = false,
+}: {
+  value: boolean
+  onChange: (v: boolean) => void
+  locked?: boolean
+}) {
+  const button = (
     <button
       onClick={() => onChange(!value)}
-      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors cursor-pointer ${
+      disabled={locked}
+      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
         value ? 'bg-green-600' : 'bg-gray-600'
-      }`}
+      } ${locked ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
     >
       <span
         className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
@@ -31,6 +49,15 @@ function ToggleSwitch({ value, onChange }: { value: boolean; onChange: (v: boole
         }`}
       />
     </button>
+  )
+
+  if (!locked) return button
+
+  return (
+    <span className="group relative">
+      {button}
+      <Tooltip>At least one reminder must be enabled.</Tooltip>
+    </span>
   )
 }
 
@@ -67,6 +94,7 @@ function TestButton({
 function CardHeader({
   label,
   enabled,
+  locked,
   strategyId,
   testingStrategy,
   running,
@@ -75,6 +103,7 @@ function CardHeader({
 }: {
   label: string
   enabled: boolean
+  locked: boolean
   strategyId: string
   testingStrategy: string | null
   running: boolean
@@ -84,14 +113,14 @@ function CardHeader({
   return (
     <div className="flex items-center gap-3">
       <span className="flex-1 text-sm text-gray-300">{label}</span>
-      <ToggleSwitch value={enabled} onChange={onToggle} />
+      <ToggleSwitch value={enabled} onChange={onToggle} locked={locked} />
       <TestButton strategyId={strategyId} testingStrategy={testingStrategy} running={running} onTest={onTest} />
     </div>
   )
 }
 
 export function ReminderSettingsPanel({ running }: { running: boolean }) {
-  const { prefs, loading, error, testingStrategy, testError, updatePrefs, testStrategy } =
+  const { prefs, loading, testingStrategy, testError, updatePrefs, testStrategy } =
     useReminderPreferences()
 
   // Show a "Loading..." placeholder until the initial preferences arrive from the main process. 
@@ -106,6 +135,13 @@ export function ReminderSettingsPanel({ running }: { running: boolean }) {
 
   const p = prefs as ReminderPreferences
 
+  const enabledCount =
+    Number(p.overlay.enabled) +
+    Number(p.screenEdgeGlow.enabled) +
+    Number(p.cornerPopup.enabled) +
+    Number(p.audioCue.enabled)
+  const isLastEnabled = (enabled: boolean) => enabled && enabledCount === 1
+
   const update = (patch: Partial<ReminderPreferences>) => {
     updatePrefs({ ...p, ...patch })
   }
@@ -114,9 +150,9 @@ export function ReminderSettingsPanel({ running }: { running: boolean }) {
     <div className="rounded-lg bg-gray-800 p-4">
       <h2 className="mb-4 text-lg font-semibold text-white">Reminders</h2>
 
-      {(error || testError) && (
+      {testError && (
         <div className="mb-3 rounded bg-red-900/50 px-3 py-2 text-sm text-red-300">
-          {error || testError}
+          {testError}
         </div>
       )}
 
@@ -126,6 +162,7 @@ export function ReminderSettingsPanel({ running }: { running: boolean }) {
           <CardHeader
             label="In-app overlay"
             enabled={p.overlay.enabled}
+            locked={isLastEnabled(p.overlay.enabled)}
             strategyId="overlay"
             testingStrategy={testingStrategy}
             running={running}
@@ -139,6 +176,7 @@ export function ReminderSettingsPanel({ running }: { running: boolean }) {
           <CardHeader
             label="Screen edge glow"
             enabled={p.screenEdgeGlow.enabled}
+            locked={isLastEnabled(p.screenEdgeGlow.enabled)}
             strategyId="screen-edge-glow"
             testingStrategy={testingStrategy}
             running={running}
@@ -181,6 +219,7 @@ export function ReminderSettingsPanel({ running }: { running: boolean }) {
           <CardHeader
             label="Corner popup"
             enabled={p.cornerPopup.enabled}
+            locked={isLastEnabled(p.cornerPopup.enabled)}
             strategyId="corner-popup"
             testingStrategy={testingStrategy}
             running={running}
@@ -221,6 +260,7 @@ export function ReminderSettingsPanel({ running }: { running: boolean }) {
           <CardHeader
             label="Audio cue"
             enabled={p.audioCue.enabled}
+            locked={isLastEnabled(p.audioCue.enabled)}
             strategyId="audio-cue"
             testingStrategy={testingStrategy}
             running={running}

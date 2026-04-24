@@ -15,12 +15,12 @@ import type { ReminderPreferences } from '../../shared/ipc-messages'
 export function useReminderPreferences() {
   // `prefs === null` means the initial load hasn't finished yet.  
   const [prefs, setPrefs] = useState<ReminderPreferences | null>(null)
-  const [error, setError] = useState<string | null>(null)
+
   // The id of the strategy whose Test button is currently running, or null if no test is active. 
   const [testingStrategy, setTestingStrategy] = useState<string | null>(null)
+
   const [testError, setTestError] = useState<string | null>(null)
-  // Timers for clearing the error banners after 3 seconds. 
-  const errorTimer = useRef<ReturnType<typeof setTimeout>>()
+  // Timer for clearing the error banners after 3 seconds. 
   const testErrorTimer = useRef<ReturnType<typeof setTimeout>>()
 
   // Fetch preferences once, on mount.
@@ -30,7 +30,6 @@ export function useReminderPreferences() {
 
   useEffect(() => {
     return () => {
-      if (errorTimer.current) clearTimeout(errorTimer.current)
       if (testErrorTimer.current) clearTimeout(testErrorTimer.current)
     }
   }, [])
@@ -41,11 +40,8 @@ export function useReminderPreferences() {
     const prev = prefs
     setPrefs(nextPrefs)
 
-    window.blinkBuddy.updateReminderPreferences(nextPrefs).catch((err: Error) => {
+    window.blinkBuddy.updateReminderPreferences(nextPrefs).catch(() => {
       setPrefs(prev)
-      setError(err.message)
-      if (errorTimer.current) clearTimeout(errorTimer.current)
-      errorTimer.current = setTimeout(() => setError(null), 3000)
     })
   }, [prefs])
 
@@ -68,7 +64,6 @@ export function useReminderPreferences() {
   return {
     prefs,
     loading: prefs === null,
-    error,
     testingStrategy,
     testError,
     updatePrefs,
