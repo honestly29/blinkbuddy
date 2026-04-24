@@ -6,6 +6,7 @@ import type { SessionSummary } from '../../shared/ipc-messages'
 // These short sessions are filtered out of the stats and chart, but still appear in the session history list so the user has a complete record.
 const MIN_SESSION_SECONDS = 120
 
+const HEALTHY_BLINK_RATE = 15 // blinks per minute
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -35,8 +36,8 @@ interface OverviewStats {
   totalTimeSeconds: number
   totalReminders: number
   avgRemindersPerSession: number
-  compliancePercent: number | null
-  totalBreaksTaken: number
+  healthySessionPercent: number | null // null = no meaningful sessions to measure
+  healthySessionCount: number
 }
 
 
@@ -44,20 +45,16 @@ function computeOverviewStats(sessions: SessionSummary[]): OverviewStats {
   const totalSessions = sessions.length
   const totalTimeSeconds = sessions.reduce((sum, s) => sum + s.totalDurationSeconds, 0)
   const totalReminders = sessions.reduce((sum, s) => sum + s.remindersTriggered, 0)
-  const totalBreaksTaken = sessions.reduce((sum, s) => sum + s.twentyTwentyBreaksTaken, 0)
+  const healthySessionCount = sessions.filter(
+    (s) => s.avgBlinksPerMinute >= HEALTHY_BLINK_RATE,
+  ).length
 
-  // Count how many 20-minute cycles fit into each session, then sum them.
-  const totalExpectedBreaks = sessions.reduce(
-    (sum, s) => sum + Math.floor(s.totalDurationSeconds / 1200),
-    0,
-  )
-
+  // Weighted average blink rate, weighted by session duration.
+  // sum(blink_rate × duration) / sum(duration)
   const weightedSum = sessions.reduce(
     (sum, s) => sum + s.avgBlinksPerMinute * s.totalDurationSeconds,
     0,
   )
-  // Weighted average blink rate, weighted by session duration.
-  // sum(blink_rate × duration) / sum(duration)
   const avgBlinkRate = totalTimeSeconds > 0 ? weightedSum / totalTimeSeconds : 0
 
   return {
@@ -66,10 +63,9 @@ function computeOverviewStats(sessions: SessionSummary[]): OverviewStats {
     totalTimeSeconds,
     totalReminders,
     avgRemindersPerSession: totalSessions > 0 ? totalReminders / totalSessions : 0,
-    // Null when no 20-20-20 breaks were ever expected
-    compliancePercent:
-      totalExpectedBreaks > 0 ? (totalBreaksTaken / totalExpectedBreaks) * 100 : null,
-    totalBreaksTaken,
+    healthySessionPercent:
+      totalSessions > 0 ? (healthySessionCount / totalSessions) * 100 : null,
+      healthySessionCount,
   }
 }
 
@@ -160,8 +156,8 @@ function BlinkRateChart({ sessions }: { sessions: SessionSummary[] }) {
   const maxRate = Math.max(...days.map((d) => d.rate), 20)
   const ceilMax = Math.ceil(maxRate / 10) * 10
 
-  // Y position of the reference line at 15 blinks/min.
-  const refY = padTop + chartHeight - (15 / ceilMax) * chartHeight
+  // Y position of the reference line at the healthy blink rate threshold 
+  const refY = padTop + chartHeight - (HEALTHY_BLINK_RATE / ceilMax) * chartHeight
 
   const barWidth = 28
   const barGap = 14
@@ -260,8 +256,8 @@ function BlinkRateChart({ sessions }: { sessions: SessionSummary[] }) {
               - the date label below the X-axis
               - the daily monitoring time below the date */}
           {days.map((d, i) => {
-            // Colours: green for healthy (>=15), amber for low.
-            const healthy = d.rate >= 15
+            // Colours: green for healthy, amber for low.
+            const healthy = d.rate >= HEALTHY_BLINK_RATE
             const fill = healthy
               ? 'rgba(34, 197, 94, 0.75)'
               : 'rgba(217, 158, 20, 0.75)'
@@ -391,7 +387,7 @@ function groupSessionsByDay(sessions: SessionSummary[]): SessionGroup[] {
 
 // Display blink rate with a health-indicating colour.
 function BlinkRateBadge({ rate }: { rate: number }) {
-  const healthy = rate >= 15
+  const healthy = rate >= HEALTHY_BLINK_RATE
 
   const colour = healthy
     ? 'bg-green-500/20 text-green-400'
@@ -503,7 +499,7 @@ export function SessionHistory() {
   if (sessions.length === 0) {
     return (
       <div className="rounded-lg bg-gray-800 p-6 text-center text-gray-400">
-        No sessions yet — start monitoring to see your stats here.
+        No sessions yet - start monitoring to see your stats here.
       </div>
     )
   }
@@ -535,23 +531,22 @@ export function SessionHistory() {
             subtitle={`Average of ${Math.round(stats.avgRemindersPerSession)} reminders per session`}
           />
           <SummaryCard
-            label="20-20-20 Compliance"
+            label="Healthy Session Rate*"
             value={
-              stats.compliancePercent === null
+              stats.healthySessionPercent === null
                 ? 'N/A'
-                : stats.totalBreaksTaken === 0
-                  ? 'N/A'
-                  : `${Math.round(stats.compliancePercent)}%`
+                : `${Math.round(stats.healthySessionPercent)}%`
             }
             subtitle={
-              stats.compliancePercent === null
-                ? 'Sessions too short to require breaks'
-                : stats.totalBreaksTaken === 0
-                  ? 'No breaks recorded'
-                  : undefined
+              stats.healthySessionPercent === null
+                ? 'No meaningful sessions yet'
+                : `${stats.healthySessionCount} of ${stats.totalSessions} sessions`
             }
           />
         </div>
+        <p className="mt-3 text-xs font-medium text-gray-500">
+          {`* A healthy session averages at least ${HEALTHY_BLINK_RATE} blinks per minute.`}
+        </p>
       </div>
 
       {/* Blink rate trend. */}

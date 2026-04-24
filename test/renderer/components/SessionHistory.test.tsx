@@ -69,7 +69,11 @@ describe('SessionHistory', () => {
       expect(screen.getByText('10.0 blinks/min')).toBeDefined()
       expect(screen.getByText('5m monitored')).toBeDefined()
       expect(screen.getByText('Total Reminders')).toBeDefined()
-      expect(screen.getByText('20-20-20 Compliance')).toBeDefined()
+      expect(screen.getByText('Healthy Session Rate*')).toBeDefined()
+      expect(screen.getByText('0 of 1 sessions')).toBeDefined()
+      expect(
+        screen.getByText('* A healthy session averages at least 15 blinks per minute.'),
+      ).toBeDefined()
     })
   })
 
@@ -103,31 +107,38 @@ describe('SessionHistory', () => {
     })
   })
 
-  it('shows N/A for 20-20-20 compliance when no breaks recorded', async () => {
+  it('shows N/A for Healthy Session Rate when no meaningful sessions exist', async () => {
     mockGetSessionHistory.mockResolvedValue([
-      makeSummary({ totalDurationSeconds: 1500, twentyTwentyBreaksTaken: 0 }),
+      makeSummary({ totalDurationSeconds: 60 }), // below MIN_SESSION_SECONDS (120)
     ])
     render(<SessionHistory />)
 
     await waitFor(() => {
-      expect(screen.getByText('No breaks recorded')).toBeDefined()
+      expect(screen.getByText('Healthy Session Rate*')).toBeDefined()
+      expect(screen.getByText('N/A')).toBeDefined()
+      expect(screen.getByText('No meaningful sessions yet')).toBeDefined()
+      expect(
+        screen.getByText('* A healthy session averages at least 15 blinks per minute.'),
+      ).toBeDefined()
     })
   })
 
-  it('shows percentage for 20-20-20 compliance when breaks taken', async () => {
-    // 2400s = 40 minutes: expects 2 breaks, user took 2 = 100% compliance.
+  it('shows percentage and "X of Y sessions" subtitle for Healthy Session Rate', async () => {
     mockGetSessionHistory.mockResolvedValue([
-      makeSummary({ totalDurationSeconds: 2400, twentyTwentyBreaksTaken: 2 }),
+      makeSummary({ sessionStart: todayAt(9), avgBlinksPerMinute: 18 }), // healthy
+      makeSummary({ sessionStart: todayAt(10), avgBlinksPerMinute: 15 }), // healthy (boundary)
+      makeSummary({ sessionStart: todayAt(11), avgBlinksPerMinute: 8 }), // unhealthy
     ])
     render(<SessionHistory />)
 
     await waitFor(() => {
-      expect(screen.getByText('100%')).toBeDefined()
+      expect(screen.getByText('67%')).toBeDefined()
+      expect(screen.getByText('2 of 3 sessions')).toBeDefined()
     })
   })
 
   it('shows "Show older sessions" toggle for old sessions', async () => {
-    // One session today, one 10 days ago. The 10-day-old session falls
+    // One session today, one 10 days ago. The 10 day old session falls
     // past the 7-day cutoff and should be hidden until the toggle is clicked.
     const sessions = [
       makeSummary({ sessionStart: daysAgo(10), totalBlinks: 30 }),
