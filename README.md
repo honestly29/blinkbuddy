@@ -51,7 +51,7 @@ On first launch, macOS will prompt for camera access. Click **Allow**. Without c
 
 ## Running from source
 
-Use this path if you are on an Intel Mac, want to inspect the code, or want to rebuild the packaged binary yourself.
+Use this path if you want to inspect the code, rebuild the packaged binary, or attempt to run BlinkBuddy on a machine other than Apple Silicon macOS (untested).
 
 ### Prerequisites
 
@@ -166,7 +166,8 @@ BlinkBuddy is a working prototype that demonstrates the core idea of blink-based
 
 ### Platform
 
-- **macOS Apple Silicon only for the packaged build.** The `.dmg` is built for arm64. Windows, Linux, and Intel Mac users must run from source. A universal or cross-platform build was feasible but deprioritised in favour of other features given project time constraints.
+- **Packaged build is macOS Apple Silicon only.** The `.dmg` is built for arm64. A universal or cross-platform build was feasible but deprioritised in favour of other features given project time constraints.
+- **Only tested on macOS Apple Silicon.** The codebase is built on cross-platform technologies (Electron, Node, Python, MediaPipe, OpenCV), so running from source on Windows, Linux, or Intel Mac may work, but none of these configurations have been tested. Source install on other platforms should be considered experimental.
 - **Unsigned binary.** The packaged app requires a one-time Gatekeeper bypass on macOS (see installation instructions). Code signing requires a paid Apple Developer Programme membership.
 - **Screen edge glow offset on macOS.** The screen edge glow reminder is intended to cover all four edges of the screen. On macOS, the glow does not account for the dock's position: when the dock is visible on the bottom (or side), the glow on that edge is pushed inward by the dock's width or height, leaving a visible gap between the glow and the actual screen edge. This persists even when windows are in full-screen mode. The reminder is still visible and functional but the visuals are incomplete on the docked edge.
 
