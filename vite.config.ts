@@ -8,7 +8,7 @@ export default defineConfig({
     react(),
     electron([
       {
-        entry: 'src/main/index.ts', // main process
+        entry: 'src/main/index.ts', 
       },
       {
         entry: 'src/main/preload.ts',

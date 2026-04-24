@@ -1,4 +1,4 @@
-// Tips & Info page content.
+// Tips & Info page content
 export function CvsTipsPanel() {
   return (
     <>
@@ -6,7 +6,6 @@ export function CvsTipsPanel() {
         <h2 className="mb-3 text-lg font-semibold text-white">
           What is Computer Vision Syndrome?
         </h2>
-        
         <div className="space-y-3 text-sm leading-relaxed text-gray-300">
           <p>
             Computer Vision Syndrome (CVS), also known as digital eye strain, is
@@ -19,8 +18,9 @@ export function CvsTipsPanel() {
             One of the main causes is reduced blinking. When we focus on screens,
             our blink rate can drop significantly - studies have shown it can fall
             from around 22 blinks per minute at rest to as few as 7 during screen
-            use. Blinking is essential for keeping the surface of the eye moist
-            and comfortable.
+            use. A blink rate of 15 or more per minute is generally considered healthy 
+            for screen users. Blinking is essential for keeping the surface of the eye 
+            moist and comfortable.
           </p>
         </div>
       </div>
@@ -35,6 +35,8 @@ export function CvsTipsPanel() {
             When you go too long without blinking, it sends you a gentle
             reminder. All processing happens locally on your device - no video is
             recorded, stored, or transmitted.
+            You can also review your blinking history on the Stats page to see how 
+            your habits change over time.
           </p>
           <p>
             The goal is simple: help you become more aware of your blinking
@@ -47,23 +49,24 @@ export function CvsTipsPanel() {
         <h2 className="mb-3 text-lg font-semibold text-white">
           Quick start guide
         </h2>
-      
         <ol className="list-decimal list-inside space-y-2 text-sm leading-relaxed text-gray-300">
           <li>
             Go to Settings and choose your camera
           </li>
           <li>
             Set your blink window - this is how many seconds without a blink
-            before you get a reminder (default is 20 seconds)
+            before you get a reminder (default is 8 seconds)
           </li>
           <li>
-            Choose which reminder types you'd like (screen glow, popup, sound,
-            or a combination)
+            Choose which reminder types you'd like: a full-screen overlay, subtle screen edge glow, a corner popup, a sound cue, or any combination.
           </li>
           <li>Go to Monitor and press Start</li>
           <li>
             BlinkBuddy will run in the background - you'll only notice it when
             you need to blink
+          </li>
+          <li>
+            After a few sessions, check the Stats page to see your trends over time
           </li>
         </ol>
       </div>
@@ -97,14 +100,13 @@ export function CvsTipsPanel() {
         </h2>
         <p className="text-sm leading-relaxed text-gray-300">
           Position your screen to avoid glare from windows or overhead lights.
-          Try to match your screen brightness to the ambient lighting in the room
-          - if the screen looks like a light source, it's too bright; if it looks
+          Try to match your screen brightness to the ambient lighting in the room -
+          if the screen looks like a light source, it's too bright; if it looks
           dull and grey, it's too dim. Consider using a humidifier in dry
           environments, as low humidity accelerates tear evaporation.
         </p>
       </div>
 
-      {/* Disclaimer card. */}
       <div className="rounded-lg border border-amber-500/30 bg-gray-800 p-5">
         <h2 className="mb-3 text-lg font-semibold text-amber-200/80">
           Important note
@@ -119,3 +121,8 @@ export function CvsTipsPanel() {
     </>
   )
 }
+
+
+
+
+{/* Disclaimer card. */}

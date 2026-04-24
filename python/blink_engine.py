@@ -11,7 +11,7 @@ class BlinkEngine:
     Uses the `type` field discriminator pattern so that a future
     `partial_blink_event` can be added without breaking existing handlers.
 
-    All thresholds are read from config.py — nothing is hardcoded.
+    All thresholds are read from config.py - nothing is hardcoded.
     """
 
     def __init__(self):
@@ -76,7 +76,7 @@ class BlinkEngine:
                 self._last_blink_time_ms = now_ms
             self._below_count = 0  # EAR above threshold but not enough consecutive frames is considered as noise
         else:
-            # EAR above threshold but below_count < consec_frames — not a blink.
+            # EAR above threshold but below_count < consec_frames - not a blink.
             self._below_count = 0
 
         return events

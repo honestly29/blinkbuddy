@@ -5,7 +5,7 @@ import type { CameraInfo } from '../../shared/protocol'
 // Renderer-side copy of the default settings.
 // Used as initial React state before loadSettings() resolves.
 const DEFAULT_SETTINGS: UserSettings = {
-  blinkWindowSeconds: 20,
+  blinkWindowSeconds: 8,
   cameraIndex: 0,
   previewEnabled: false,
   twentyTwentyEnabled: true,

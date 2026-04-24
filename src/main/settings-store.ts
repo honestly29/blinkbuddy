@@ -2,9 +2,10 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { UserSettings } from '../shared/ipc-messages'
 
-// Defaults for all user-configurable settings
+// Defaults for user-configurable settings
 export const DEFAULT_SETTINGS: UserSettings = {
-  blinkWindowSeconds: 20,
+  // Default healthy blink rate; based on intervention studies (Ashwini et al.,2021) 
+  blinkWindowSeconds: 8,
   cameraIndex: 0,
   previewEnabled: false,
   twentyTwentyEnabled: true,

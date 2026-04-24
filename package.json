@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "vitest",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "build:python": "node scripts/build-python.mjs",
     "build:renderer": "vite build",
     "build:electron": "electron-builder",

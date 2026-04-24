@@ -4,7 +4,7 @@ import App from '../../../src/renderer/App'
 import type { StateUpdate, UserSettings } from '../../../src/shared/ipc-messages'
 
 const defaultSettings: UserSettings = {
-  blinkWindowSeconds: 20,
+  blinkWindowSeconds: 8,
   cameraIndex: 0,
   previewEnabled: false,
   twentyTwentyEnabled: true,
@@ -178,7 +178,7 @@ describe('App', () => {
       expect(mockStart).toHaveBeenCalledWith({
         cameraIndex: 0,
         previewEnabled: false,
-        blinkWindowSeconds: 20,
+        blinkWindowSeconds: 8,
         twentyTwentyEnabled: true,
       })
     })

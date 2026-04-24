@@ -115,7 +115,7 @@ export function registerIpcHandlers(
       // Forward the user's settings to the Session Manager.
       cameraIndex: args?.cameraIndex ?? 0,
       previewEnabled: args?.previewEnabled ?? false,
-      blinkWindowSeconds: args?.blinkWindowSeconds ?? 10,
+      blinkWindowSeconds: args?.blinkWindowSeconds ?? 8,
       twentyTwentyEnabled: args?.twentyTwentyEnabled ?? true,
     })
   })
