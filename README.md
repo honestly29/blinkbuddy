@@ -91,6 +91,13 @@ npm run dev
 
 This launches the Vite dev server, which starts Electron via `vite-plugin-electron`. The main process spawns the Python service as a subprocess, and the BlinkBuddy window opens. Renderer changes hot-reload automatically. Changes to the Electron main process trigger an automatic Electron restart. Changes to the Python service require manually stopping and re-running `npm run dev`.
 
+**First-run note:** The first time you click Start Monitoring,
+expect roughly 25 seconds before face detection activates. During
+this time the monitoring status will show "No face detected" even
+if you are facing the camera. This is the camera and detection
+pipeline initialising. Subsequent starts in the same session are
+much faster.
+
 ### Available npm scripts
 
 | Script | Description |

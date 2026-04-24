@@ -514,7 +514,7 @@ export function SessionHistory() {
       {/* Overview summary cards */}
       <div>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">
-          Overview
+          Overview*
         </h2>
         <div className="grid grid-cols-2 gap-4">
           <SummaryCard
@@ -532,7 +532,7 @@ export function SessionHistory() {
             subtitle={`Average of ${Math.round(stats.avgRemindersPerSession)} reminders per session`}
           />
           <SummaryCard
-            label="Healthy Session Rate*"
+            label="Healthy Session Rate**"
             value={
               stats.healthySessionPercent === null
                 ? 'N/A'
@@ -545,8 +545,11 @@ export function SessionHistory() {
             }
           />
         </div>
+        <p className="mt-1 text-xs font-medium text-gray-500">
+          {`* Stats and the trend chart only include sessions longer than ${MIN_SESSION_SECONDS / 60} minutes.`}
+        </p>
         <p className="mt-3 text-xs font-medium text-gray-500">
-          {`* A healthy session averages at least ${HEALTHY_BLINK_RATE} blinks per minute.`}
+          {`** A healthy session averages at least ${HEALTHY_BLINK_RATE} blinks per minute.`}
         </p>
       </div>
 

@@ -99,14 +99,17 @@ describe('SessionHistory', () => {
     render(<SessionHistory />)
 
     await waitFor(() => {
-      expect(screen.getByText('Overview')).toBeDefined()
+      expect(screen.getByText('Overview*')).toBeDefined()
       expect(screen.getByText('10.0 blinks/min')).toBeDefined()
       expect(screen.getByText('5m monitored')).toBeDefined()
       expect(screen.getByText('Total Reminders')).toBeDefined()
-      expect(screen.getByText('Healthy Session Rate*')).toBeDefined()
+      expect(screen.getByText('Healthy Session Rate**')).toBeDefined()
       expect(screen.getByText('0 of 1 sessions')).toBeDefined()
       expect(
-        screen.getByText('* A healthy session averages at least 15 blinks per minute.'),
+        screen.getByText('* Stats and the trend chart only include sessions longer than 2 minutes.'),
+      ).toBeDefined()
+      expect(
+        screen.getByText('** A healthy session averages at least 15 blinks per minute.'),
       ).toBeDefined()
     })
   })
@@ -148,11 +151,11 @@ describe('SessionHistory', () => {
     render(<SessionHistory />)
 
     await waitFor(() => {
-      expect(screen.getByText('Healthy Session Rate*')).toBeDefined()
+      expect(screen.getByText('Healthy Session Rate**')).toBeDefined()
       expect(screen.getByText('N/A')).toBeDefined()
       expect(screen.getByText('No meaningful sessions yet')).toBeDefined()
       expect(
-        screen.getByText('* A healthy session averages at least 15 blinks per minute.'),
+        screen.getByText('** A healthy session averages at least 15 blinks per minute.'),
       ).toBeDefined()
     })
   })
