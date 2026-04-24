@@ -108,6 +108,7 @@ export class CornerPopupStrategy implements ReminderStrategy {
       x, y,
       width: POPUP_WIDTH,
       height: POPUP_HEIGHT,
+      type: 'panel',
       transparent: true,
       frame: false,
       alwaysOnTop: true,

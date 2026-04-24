@@ -132,6 +132,7 @@ describe('CornerPopupStrategy', () => {
     strategy.onReminderStart()
 
     const opts = MockBrowserWindow.mock.calls[0][0] as Record<string, unknown>
+    expect(opts.type).toBe('panel')
     expect(opts.transparent).toBe(true)
     expect(opts.frame).toBe(false)
     expect(opts.alwaysOnTop).toBe(true)

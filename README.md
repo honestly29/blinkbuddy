@@ -74,9 +74,10 @@ npm install
 python3 -m venv .venv
 source .venv/bin/activate
 
-# 4. Install Python runtime dependencies
+# 4. Install Python dependencies (runtime + test)
 pip install --upgrade pip
 pip install -r python/requirements.txt
+pip install pytest
 
 # 5. Download the MediaPipe Face Landmarker model (~6 MB)
 python scripts/setup_model.py
