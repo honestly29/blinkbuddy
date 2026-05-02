@@ -89,15 +89,6 @@ export function useSettings() {
     }
   }, [])
 
-  // Re-fetch the camera list from the Python process.
-  const refreshCameras = useCallback(() => {
-    setCamerasLoading(true)
-    window.blinkBuddy
-      .listCameras()
-      .then(setCameras)
-      .finally(() => setCamerasLoading(false))
-  }, [])
-
   return {
     settings,
     cameras,
@@ -106,6 +97,5 @@ export function useSettings() {
     setCameraIndex,
     setPreviewEnabled,
     setTwentyTwentyEnabled,
-    refreshCameras,
   }
 }

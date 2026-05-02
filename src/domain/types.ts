@@ -22,15 +22,6 @@ export interface TwentyTwentyState {
   breakTimeRemainingMs: number
 }
 
-// ---------------------------------------------------------------------------
-// Blink statistics snapshot
-// ---------------------------------------------------------------------------
-
-export interface BlinkStatsSnapshot {
-  blinksPerMinute: number
-  totalBlinks: number
-  interBlinkIntervals: number[]
-}
 
 // ---------------------------------------------------------------------------
 // Domain event inputs (used by the reminder state machine)
