@@ -6,7 +6,9 @@ import time
 import cv2
 
 from python.config import load_config
-from python.camera import Camera, check_camera_permission, list_cameras
+from python.camera import Camera
+from python.camera_enumeration import list_cameras
+from python.camera_permission import check_camera_permission
 from python.detector import FaceDetector
 from python.blink_engine import BlinkEngine
 from python.preview import render_preview
