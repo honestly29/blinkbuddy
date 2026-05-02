@@ -22,7 +22,8 @@ COLOUR_LEFT_EYE = (0, 255, 0)        # green
 COLOUR_RIGHT_EYE = (0, 255, 0)       # green
 COLOUR_LIPS = (0, 128, 255)          # orange
 
-# MediaPipe Face Mesh landmark indices 
+# -- MediaPipe Face Mesh landmark indices --
+ 
 # Face oval 
 FACE_OVAL_INDICES = [
     10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288,
@@ -30,14 +31,14 @@ FACE_OVAL_INDICES = [
     172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109, 10,
 ]
 
-# Left eye 
-LEFT_EYE_INDICES = [
+# Left eye contour (16 points). These trace a closed curve around the eye for drawing.
+LEFT_EYE_CONTOUR_INDICES = [
     362, 382, 381, 380, 374, 373, 390, 249, 263, 466, 388, 387,
     386, 385, 384, 398, 362,
 ]
 
-# Right eye 
-RIGHT_EYE_INDICES = [
+# Right eye contour (16 points). These trace a closed curve around the eye for drawing.
+RIGHT_EYE_CONTOUR_INDICES = [
     33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158,
     159, 160, 161, 246, 33,
 ]
@@ -94,10 +95,10 @@ def draw_landmarks(frame, landmarks):
     face_oval = _landmarks_to_polyline(landmarks, FACE_OVAL_INDICES, w, h)
     cv2.polylines(frame, [face_oval], isClosed=False, color=COLOUR_FACE_OVAL, thickness=1)
 
-    left_eye = _landmarks_to_polyline(landmarks, LEFT_EYE_INDICES, w, h)
+    left_eye = _landmarks_to_polyline(landmarks, LEFT_EYE_CONTOUR_INDICES, w, h)
     cv2.polylines(frame, [left_eye], isClosed=False, color=COLOUR_LEFT_EYE, thickness=1)
 
-    right_eye = _landmarks_to_polyline(landmarks, RIGHT_EYE_INDICES, w, h)
+    right_eye = _landmarks_to_polyline(landmarks, RIGHT_EYE_CONTOUR_INDICES, w, h)
     cv2.polylines(frame, [right_eye], isClosed=False, color=COLOUR_RIGHT_EYE, thickness=1)
 
     lips = _landmarks_to_polyline(landmarks, LIPS_INDICES, w, h)
