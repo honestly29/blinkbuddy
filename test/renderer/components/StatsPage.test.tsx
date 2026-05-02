@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
-import { SessionHistory, formatSessionTime } from '../../../src/renderer/components/SessionHistory'
+import { StatsPage } from '../../../src/renderer/components/StatsPage'
+import { formatSessionTime } from '../../../src/renderer/components/session-stats'
 import type { SessionSummary } from '../../../src/shared/ipc-messages'
 
 const mockGetSessionHistory = vi.fn()
@@ -82,10 +83,10 @@ describe('formatSessionTime', () => {
   })
 })
 
-describe('SessionHistory', () => {
+describe('StatsPage', () => {
   it('renders empty state when history is empty', async () => {
     mockGetSessionHistory.mockResolvedValue([])
-    render(<SessionHistory />)
+    render(<StatsPage />)
 
     await waitFor(() => {
       expect(
@@ -96,7 +97,7 @@ describe('SessionHistory', () => {
 
   it('renders overview cards with session data', async () => {
     mockGetSessionHistory.mockResolvedValue([makeSummary()])
-    render(<SessionHistory />)
+    render(<StatsPage />)
 
     await waitFor(() => {
       expect(screen.getByText('Overview*')).toBeDefined()
@@ -116,7 +117,7 @@ describe('SessionHistory', () => {
 
   it('renders session row with correct format', async () => {
     mockGetSessionHistory.mockResolvedValue([makeSummary()])
-    render(<SessionHistory />)
+    render(<StatsPage />)
 
     await waitFor(() => {
       expect(screen.getByText('Session History')).toBeDefined()
@@ -133,7 +134,7 @@ describe('SessionHistory', () => {
       makeSummary({ totalDurationSeconds: 300, totalBlinks: 50, sessionStart: todayAt(10) }),
     ]
     mockGetSessionHistory.mockResolvedValue(sessions)
-    render(<SessionHistory />)
+    render(<StatsPage />)
 
     await waitFor(() => {
       // Stats card should count only the 300s session
@@ -148,7 +149,7 @@ describe('SessionHistory', () => {
     mockGetSessionHistory.mockResolvedValue([
       makeSummary({ totalDurationSeconds: 60 }), // below MIN_SESSION_SECONDS (120)
     ])
-    render(<SessionHistory />)
+    render(<StatsPage />)
 
     await waitFor(() => {
       expect(screen.getByText('Healthy Session Rate**')).toBeDefined()
@@ -166,7 +167,7 @@ describe('SessionHistory', () => {
       makeSummary({ sessionStart: todayAt(10), avgBlinksPerMinute: 15 }), // healthy (boundary)
       makeSummary({ sessionStart: todayAt(11), avgBlinksPerMinute: 8 }), // unhealthy
     ])
-    render(<SessionHistory />)
+    render(<StatsPage />)
 
     await waitFor(() => {
       expect(screen.getByText('67%')).toBeDefined()
@@ -182,7 +183,7 @@ describe('SessionHistory', () => {
       makeSummary({ sessionStart: todayAt(10), totalBlinks: 50 }),
     ]
     mockGetSessionHistory.mockResolvedValue(sessions)
-    render(<SessionHistory />)
+    render(<StatsPage />)
 
     await waitFor(() => {
       expect(screen.getByText('Show older sessions')).toBeDefined()
@@ -203,7 +204,7 @@ describe('SessionHistory', () => {
 
   it('renders "Today" date group header for today\'s sessions', async () => {
     mockGetSessionHistory.mockResolvedValue([makeSummary()])
-    render(<SessionHistory />)
+    render(<StatsPage />)
 
     await waitFor(() => {
       expect(screen.getByText('Today')).toBeDefined()

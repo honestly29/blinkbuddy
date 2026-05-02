@@ -10,7 +10,7 @@ import { ReminderOverlay } from './components/ReminderOverlay'
 import { ReminderSettingsPanel } from './components/ReminderSettingsPanel'
 import { DataManagementPanel } from './components/DataManagementPanel'
 import { CvsTipsPanel } from './components/CvsTipsPanel'
-import { SessionHistory } from './components/SessionHistory'
+import { StatsPage } from './components/StatsPage'
 import { TabBar } from './components/TabBar'
 import { TABS } from './navigation'
 import type { Tab } from './navigation'
@@ -133,7 +133,7 @@ function App() {
           <CvsTipsPanel />
         )}
         {activeTab === 'stats' && (
-          <SessionHistory />
+          <StatsPage />
         )}
         {activeTab === 'settings' && (
           <>
