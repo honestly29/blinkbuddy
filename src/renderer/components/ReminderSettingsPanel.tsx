@@ -1,7 +1,10 @@
-import type { ReactNode } from 'react'
 import { useReminderPreferences } from '../hooks/useReminderPreferences'
 import type { ReminderPreferences, CornerPosition } from '../../shared/ipc-messages'
+import { ReminderCardHeader } from './ReminderCardHeader'
 
+
+// Display names for the audio cue files. Keys must match the
+// filenames in src/renderer/assets/sounds/ 
 const SOUND_LABELS: Record<string, string> = {
   'dragon-studio-ding.mp3': 'Ding',
   'universfield-clear-bell-chime.mp3': 'Bell Chime',
@@ -10,6 +13,8 @@ const SOUND_LABELS: Record<string, string> = {
 
 const SOUND_FILES = Object.keys(SOUND_LABELS)
 
+// The four corner-popup positions, with arrow emojis for the picker
+// buttons. Order here is the order the buttons render in the UI.
 const CORNERS: { value: CornerPosition; label: string }[] = [
   { value: 'top-left', label: '\u2196' },
   { value: 'top-right', label: '\u2197' },
@@ -17,113 +22,37 @@ const CORNERS: { value: CornerPosition; label: string }[] = [
   { value: 'bottom-right', label: '\u2198' },
 ]
 
-function Tooltip({ children }: { children: ReactNode }) {
-  return (
-    <span className="pointer-events-none absolute -top-9 right-0 z-10 whitespace-nowrap rounded-md border border-gray-700 bg-gray-900 px-2 py-1 text-xs text-gray-100 opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-      {children}
-    </span>
-  )
-}
 
-// Toggle switch button
-function ToggleSwitch({
-  value,
-  onChange,
-  locked = false,
-}: {
-  value: boolean
-  onChange: (v: boolean) => void
-  locked?: boolean
-}) {
-  const button = (
-    <button
-      onClick={() => onChange(!value)}
-      disabled={locked}
-      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-        value ? 'bg-green-600' : 'bg-gray-600'
-      } ${locked ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
-    >
-      <span
-        className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
-          value ? 'translate-x-5' : 'translate-x-0'
-        }`}
-      />
-    </button>
-  )
-
-  if (!locked) return button
-
-  return (
-    <span className="group relative">
-      {button}
-      <Tooltip>At least one reminder must be enabled.</Tooltip>
-    </span>
-  )
-}
-
-// The Test button is disabled in two situations: while any strategy is
-// currently being tested, and while a monitoring session is running.
-function TestButton({
-  strategyId,
-  testingStrategy,
-  running,
-  onTest,
-}: {
-  strategyId: string
-  testingStrategy: string | null
-  running: boolean
-  onTest: (id: string) => void
-}) {
-  const isTesting = testingStrategy === strategyId
-  const isDisabled = testingStrategy !== null || running
-
-  return (
-    <button
-      onClick={() => onTest(strategyId)}
-      disabled={isDisabled}
-      className={`rounded bg-gray-600 px-3 py-1 text-xs text-gray-200 transition-colors ${
-        isDisabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-gray-500'
-      }`}
-    >
-      {isTesting ? 'Testing...' : 'Test'}
-    </button>
-  )
-}
-
-// Shared header row reused by all four strategy cards
-function CardHeader({
-  label,
-  enabled,
-  locked,
-  strategyId,
-  testingStrategy,
-  running,
-  onToggle,
-  onTest,
-}: {
-  label: string
-  enabled: boolean
-  locked: boolean
-  strategyId: string
-  testingStrategy: string | null
-  running: boolean
-  onToggle: (v: boolean) => void
-  onTest: (id: string) => void
-}) {
-  return (
-    <div className="flex items-center gap-3">
-      <span className="flex-1 text-sm text-gray-300">{label}</span>
-      <ToggleSwitch value={enabled} onChange={onToggle} locked={locked} />
-      <TestButton strategyId={strategyId} testingStrategy={testingStrategy} running={running} onTest={onTest} />
-    </div>
-  )
-}
-
+/**
+ * Settings panel for the four reminder strategies.
+ *
+ * Renders one card per strategy. Each card has a shared header 
+ * (label + on/off toggle + test button via ReminderCardHeader)
+ * and, when enabled, strategy-specific controls below it
+ * (colour, opacity, corner position, sound, volume).
+ *
+ * State is owned by the useReminderPreferences hook, not by this component.
+ * The panel displays the current preferences in the form controls
+ * (toggles, sliders, dropdowns) and calls `updatePrefs` when the user
+ * changes a value, or `testStrategy` when they click a test button. 
+ * The hook handles the actual updates and re-triggers a render with the new values.
+ *
+ * Business rule: at least one reminder must always remain enabled. When
+ * exactly one strategy is on, its toggle is `locked` so the user can't
+ * turn it off without first enabling another. The lock is enforced
+ * visually by ReminderToggleSwitch and computed here via `isLastEnabled`.
+ *
+ * @param running - Whether a real monitoring session is currently active.
+ *   Forwarded to each card's test button so previews can't be fired
+ *   during live monitoring.
+ */
 export function ReminderSettingsPanel({ running }: { running: boolean }) {
   const { prefs, loading, testingStrategy, testError, updatePrefs, testStrategy } =
     useReminderPreferences()
 
-  // Show a "Loading..." placeholder until the initial preferences arrive from the main process. 
+  // Preferences load asynchronously from the Electron main process on mount.
+  // Show a placeholder until they arrive so we don't render controls with
+  // missing values.
   if (loading) {
     return (
       <div className="rounded-lg bg-gray-800 p-4">
@@ -133,15 +62,23 @@ export function ReminderSettingsPanel({ running }: { running: boolean }) {
     )
   }
 
+  // After the loading guard above, prefs is guaranteed to be populated.
+  // The cast `as ReminderPreferences` tells TypeScript to drop the null case.
   const p = prefs as ReminderPreferences
 
-  const enabledCount =
-    Number(p.overlay.enabled) +
-    Number(p.screenEdgeGlow.enabled) +
-    Number(p.cornerPopup.enabled) +
-    Number(p.audioCue.enabled)
+  // Count how many strategies are currently enabled. Used to decide
+  // whether to lock the last enabled toggle.
+  let enabledCount = 0
+  if (p.overlay.enabled) enabledCount++
+  if (p.screenEdgeGlow.enabled) enabledCount++
+  if (p.cornerPopup.enabled) enabledCount++
+  if (p.audioCue.enabled) enabledCount++
   const isLastEnabled = (enabled: boolean) => enabled && enabledCount === 1
 
+
+  // Apply a partial update to prefs without affecting other strategies' 
+  // settings. Every control goes through this so we never accidentally 
+  // overwrite the whole object.
   const update = (patch: Partial<ReminderPreferences>) => {
     updatePrefs({ ...p, ...patch })
   }
@@ -150,6 +87,7 @@ export function ReminderSettingsPanel({ running }: { running: boolean }) {
     <div className="rounded-lg bg-gray-800 p-4">
       <h2 className="mb-4 text-lg font-semibold text-white">Reminders</h2>
 
+      {/* Render an error banner when testStrategy() has failed. */}
       {testError && (
         <div className="mb-3 rounded bg-red-900/50 px-3 py-2 text-sm text-red-300">
           {testError}
@@ -157,9 +95,10 @@ export function ReminderSettingsPanel({ running }: { running: boolean }) {
       )}
 
       <div className="space-y-3">
-        {/* In-app overlay */}
+        {/* In-app overlay - only an on/off toggle,
+            no extra controls. */}
         <div className="rounded-lg bg-gray-700/50 p-3">
-          <CardHeader
+          <ReminderCardHeader
             label="In-app overlay"
             enabled={p.overlay.enabled}
             locked={isLastEnabled(p.overlay.enabled)}
@@ -171,19 +110,23 @@ export function ReminderSettingsPanel({ running }: { running: boolean }) {
           />
         </div>
 
-        {/* Screen edge glow */}
+        {/* Screen edge glow: header + colour picker + opacity slider when
+            enabled. */}
         <div className="rounded-lg bg-gray-700/50 p-3 space-y-3">
-          <CardHeader
+          <ReminderCardHeader
             label="Screen edge glow"
             enabled={p.screenEdgeGlow.enabled}
             locked={isLastEnabled(p.screenEdgeGlow.enabled)}
             strategyId="screen-edge-glow"
             testingStrategy={testingStrategy}
             running={running}
-            onToggle={(v) => update({ screenEdgeGlow: { ...p.screenEdgeGlow, enabled: v } })}
+            onToggle={(v) =>
+              update({
+                screenEdgeGlow: { ...p.screenEdgeGlow, enabled: v },
+              })
+            }
             onTest={testStrategy}
           />
-          {/* Only render the secondary controls when the strategy is enabled. */}
           {p.screenEdgeGlow.enabled && (
             <>
               <div className="flex items-center justify-between">
@@ -191,19 +134,30 @@ export function ReminderSettingsPanel({ running }: { running: boolean }) {
                 <input
                   type="color"
                   value={p.screenEdgeGlow.colour}
-                  onChange={(e) => update({ screenEdgeGlow: { ...p.screenEdgeGlow, colour: e.target.value } })}
+                  onChange={(e) =>
+                    update({
+                      screenEdgeGlow: { ...p.screenEdgeGlow, colour: e.target.value },
+                    })
+                  }
                   className="h-8 w-8 cursor-pointer rounded border border-gray-600 bg-transparent"
                 />
               </div>
               <div className="flex items-center gap-3">
                 <label className="text-sm text-gray-300">Opacity</label>
-                
+                {/* The stored opacity is 0-1, but the slider works in 0-100. Multiply when reading out, divide when reading in. */}
                 <input
                   type="range"
                   min={0}
                   max={100}
                   value={Math.round(p.screenEdgeGlow.opacity * 100)}
-                  onChange={(e) => update({ screenEdgeGlow: { ...p.screenEdgeGlow, opacity: Number(e.target.value) / 100 } })}
+                  onChange={(e) =>
+                    update({
+                      screenEdgeGlow: {
+                        ...p.screenEdgeGlow,
+                        opacity: Number(e.target.value) / 100,
+                      },
+                    })
+                  }
                   className="flex-1 accent-blue-600"
                 />
                 <span className="w-10 text-right text-sm text-gray-400">
@@ -214,35 +168,47 @@ export function ReminderSettingsPanel({ running }: { running: boolean }) {
           )}
         </div>
 
-        {/* Corner popup */}
+        {/* Corner popup: header + corner picker (4 arrow buttons) when
+            enabled. */}
         <div className="rounded-lg bg-gray-700/50 p-3 space-y-3">
-          <CardHeader
+          <ReminderCardHeader
             label="Corner popup"
             enabled={p.cornerPopup.enabled}
             locked={isLastEnabled(p.cornerPopup.enabled)}
             strategyId="corner-popup"
             testingStrategy={testingStrategy}
             running={running}
-            onToggle={(v) => update({ cornerPopup: { ...p.cornerPopup, enabled: v } })}
+            onToggle={(v) =>
+              update({
+                cornerPopup: { ...p.cornerPopup, enabled: v },
+              })
+            }
             onTest={testStrategy}
           />
           {p.cornerPopup.enabled && (
             <div className="flex items-center justify-between">
               <label className="text-sm text-gray-300">Position</label>
-              {/* Button's for the four corners. */}
               <div className="flex">
                 {CORNERS.map((c, i) => {
+                  // First and last buttons get rounded outer corners 
+                  // Middle buttons stay square.
                   const isFirst = i === 0
                   const isLast = i === CORNERS.length - 1
                   const isActive = p.cornerPopup.corner === c.value
                   return (
                     <button
                       key={c.value}
-                      onClick={() => update({ cornerPopup: { ...p.cornerPopup, corner: c.value } })}
+                      onClick={() =>
+                        update({
+                          cornerPopup: { ...p.cornerPopup, corner: c.value },
+                        })
+                      }
                       className={`px-3 py-1.5 text-sm font-medium transition-colors ${
                         isFirst ? 'rounded-l-lg' : ''
                       } ${isLast ? 'rounded-r-lg' : ''} ${
-                        isActive ? 'bg-blue-600 text-white' : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+                        isActive
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
                       }`}
                       title={c.value}
                     >
@@ -255,16 +221,21 @@ export function ReminderSettingsPanel({ running }: { running: boolean }) {
           )}
         </div>
 
-        {/* Audio cue */}
+        {/* Audio cue: header + sound dropdown + volume slider when
+            enabled. */}
         <div className="rounded-lg bg-gray-700/50 p-3 space-y-3">
-          <CardHeader
+          <ReminderCardHeader
             label="Audio cue"
             enabled={p.audioCue.enabled}
             locked={isLastEnabled(p.audioCue.enabled)}
             strategyId="audio-cue"
             testingStrategy={testingStrategy}
             running={running}
-            onToggle={(v) => update({ audioCue: { ...p.audioCue, enabled: v } })}
+            onToggle={(v) =>
+              update({
+                audioCue: { ...p.audioCue, enabled: v },
+              })
+            }
             onTest={testStrategy}
           />
           {p.audioCue.enabled && (
@@ -273,11 +244,17 @@ export function ReminderSettingsPanel({ running }: { running: boolean }) {
                 <label className="text-sm text-gray-300">Sound</label>
                 <select
                   value={p.audioCue.soundFile}
-                  onChange={(e) => update({ audioCue: { ...p.audioCue, soundFile: e.target.value } })}
+                  onChange={(e) =>
+                    update({
+                      audioCue: { ...p.audioCue, soundFile: e.target.value },
+                    })
+                  }
                   className="ml-4 flex-1 rounded bg-gray-700 px-3 py-2 text-sm text-white"
                 >
                   {SOUND_FILES.map((file) => (
-                    <option key={file} value={file}>{SOUND_LABELS[file]}</option>
+                    <option key={file} value={file}>
+                      {SOUND_LABELS[file]}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -288,7 +265,14 @@ export function ReminderSettingsPanel({ running }: { running: boolean }) {
                   min={0}
                   max={100}
                   value={Math.round(p.audioCue.volume * 100)}
-                  onChange={(e) => update({ audioCue: { ...p.audioCue, volume: Number(e.target.value) / 100 } })}
+                  onChange={(e) =>
+                    update({
+                      audioCue: {
+                        ...p.audioCue,
+                        volume: Number(e.target.value) / 100,
+                      },
+                    })
+                  }
                   className="flex-1 accent-blue-600"
                 />
                 <span className="w-10 text-right text-sm text-gray-400">
