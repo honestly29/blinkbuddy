@@ -97,9 +97,15 @@ class FaceDetector:
             }
 
        
-        # Hardcoded because MediaPipe's FaceLandmarker doesn't expose a per-frame quality score.
+        # MediaPipe's FaceLandmarker doesn't expose a per-frame quality 
+        # score, so `quality` is hardcoded to 1.0
         quality = 1.0
 
+        # The quality threshold check below is intentionally dead code.
+        # `quality` is hardcoded to 1.0 so the body will never fire.
+        # We keep it as a possible extension point incase a future version
+        # of MediaPipe exposes quality or if we switched to a different 
+        # detector backend which provided a real quality signal
         if quality < quality_threshold:
             return {
                 "face_detected": False,

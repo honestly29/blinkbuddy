@@ -1,4 +1,10 @@
-"""Preview frame rendering: face mesh overlay drawing and JPEG encoding."""
+"""Preview frame rendering: face mesh overlay drawing and JPEG encoding.
+
+Despite drawing onto an image, this module belongs in the inference layer,
+not the renderer. Compositing the overlay here and sending a small JPEG is cheaper than shipping the raw camera frame across IPC for the renderer
+to draw itself. The output is a base64 JPEG sent over stdout; the renderer
+is what actually displays it.
+"""
 
 import base64
 
