@@ -1,4 +1,5 @@
 import type { ReminderStrategy } from './types'
+import type { ReminderStrategyId } from '../../shared/reminder-strategies'
 
 /**
  * Flag-based strategy: just tracks whether the reminder is currently active.
@@ -9,7 +10,7 @@ import type { ReminderStrategy } from './types'
  * and has nothing to reconfigure at runtime.
  */
 export class OverlayReminderStrategy implements ReminderStrategy {
-  readonly id = 'overlay'
+  readonly id: ReminderStrategyId = 'overlay'
   private _active = false
 
   /** Whether the overlay should currently be visible in the renderer. */

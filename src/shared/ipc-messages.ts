@@ -1,18 +1,31 @@
 /**
- * TypeScript type definitions for renderer <-> main Electron IPC channels.
+ * Defines all the types used for messages between the renderer and the
+ * main process.
  *
- * Renderer invokes these via contextBridge-exposed API.
- * Main process registers handlers via ipcMain.handle().
+ * The renderer talks to the main process by calling functions on
+ * window.blinkBuddy (see the BlinkBuddyAPI interface below). Each call
+ * becomes a message that travels across the IPC boundary; the main
+ * process picks it up and runs the matching handler in ipc-handlers.ts.
+ *
+ * This file is the shared contract: it defines the channel names, the
+ * argument shapes, the return shapes, and the events that flow back
+ * the other way. Both processes import from here so they agree on what
+ * each message looks like.
  */
 
 import type { CameraInfo, PythonEvent } from './protocol'
 import type { ReminderState, TwentyTwentyState } from '../domain/types'
+import type { ReminderStrategyId } from './reminder-strategies'
 
 // ---------------------------------------------------------------------------
 // IPC channel names
 // ---------------------------------------------------------------------------
 
-/**  String constants for all IPC channels used between main and renderer.*/
+/**
+ * String constants for the IPC channels used between the main and
+ * renderer processes. Both sides reference the same names from this
+ * object, so a typo on either side is caught at compile time.
+ */
 export const IPC_CHANNELS = {
   START: 'blink:start',
   STOP: 'blink:stop',
@@ -35,9 +48,14 @@ export const IPC_CHANNELS = {
 // Reminder preferences types
 // ---------------------------------------------------------------------------
 
-// The four valid corner positions for the popup window.
+/** The four valid corner positions for the popup window. */
 export type CornerPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
 
+/**
+ * User preferences for the four blink reminder strategies. Persisted
+ * to disk via ReminderPreferencesStore and applied to the live
+ * dispatcher whenever the user changes a setting.
+ */
 export interface ReminderPreferences {
   overlay: { enabled: boolean }
   screenEdgeGlow: { enabled: boolean; colour: string; opacity: number }
@@ -57,15 +75,17 @@ export interface StartArgs {
   twentyTwentyEnabled?: boolean
 }
 
+/** Argument for the SET_PREVIEW channel: turns the camera preview on or off. */
 export interface SetPreviewArgs {
   enabled: boolean
 }
 
+/** Argument for the SET_TWENTY_TWENTY channel: turns 20-20-20 breaks on or off. */
 export interface SetTwentyTwentyArgs {
   enabled: boolean
 }
 
-/** User-configurable preferences persisted to settings.json. */
+/** User-configurable preferences persisted to disk by SettingsStore. */
 export interface UserSettings {
   blinkWindowSeconds: number
   cameraIndex: number
@@ -73,18 +93,33 @@ export interface UserSettings {
   twentyTwentyEnabled: boolean
 }
 
+/**
+ * Result of an export-to-CSV attempt. Each variant is for a different
+ * outcome:
+ *   - saved: the file was written successfully (filePath included).
+ *   - cancelled: the user closed the save dialog without picking a file.
+ *   - no-sessions: there were no sessions to export.
+ *   - error: the write failed (message describes the cause).
+ */
 export type ExportSessionsResult =
   | { status: 'saved'; filePath: string }
   | { status: 'cancelled' }
   | { status: 'no-sessions' }
   | { status: 'error'; message: string }
 
+/**
+ * Result of a clear-sessions attempt. Variants:
+ *   - cleared: all sessions were deleted.
+ *   - cancelled: the user closed the confirm dialog without confirming.
+ *   - error: the deletion failed (message describes the cause).
+ */
 export type ClearSessionsResult =
   | { status: 'cleared' }
   | { status: 'cancelled' }
   | { status: 'error'; message: string }
 
-/** Summary of a completed monitoring session, persisted to sessions.json. */
+
+/** Summary of a completed monitoring session, persisted to disk by SessionLogger. */
 export interface SessionSummary {
   sessionStart: string    // ISO 8601 timestamp
   sessionEnd: string      // ISO 8601 timestamp
@@ -101,7 +136,12 @@ export interface SessionSummary {
 // Consolidated state update pushed from Session Manager to renderer
 // ---------------------------------------------------------------------------
 
-/** Snapshot of all monitoring state, sent to the renderer on every change. */
+/**
+ * Snapshot of all live monitoring state. The Session Manager builds
+ * one of these whenever the state changes and pushes it to the
+ * renderer via the STATE_UPDATE channel; the renderer uses it to
+ * update the UI.
+ */
 export interface StateUpdate {
   type: 'state_update'
   running: boolean
@@ -120,7 +160,11 @@ export interface StateUpdate {
 // Preload API shape exposed to renderer via contextBridge
 // ---------------------------------------------------------------------------
 
-/** The complete API surface available as window.blinkBuddy in the renderer. */
+/**
+ * The API surface available as window.blinkBuddy in the renderer.
+ * Each method here corresponds to one IPC channel registered in
+ * ipc-handlers.ts.
+ */
 export interface BlinkBuddyAPI {
   start: (args?: StartArgs) => Promise<void>
   stop: () => Promise<void>
@@ -132,7 +176,7 @@ export interface BlinkBuddyAPI {
   loadSettings: () => Promise<UserSettings>
   getReminderPreferences: () => Promise<ReminderPreferences>
   updateReminderPreferences: (prefs: ReminderPreferences) => Promise<void>
-  testReminder: (strategyId: string) => Promise<void>
+  testReminder: (strategyId: ReminderStrategyId) => Promise<void>
    exportSessionsCsv: () => Promise<ExportSessionsResult>
   clearSessions: () => Promise<ClearSessionsResult>
   onPythonEvent: (callback: (event: PythonEvent) => void) => () => void

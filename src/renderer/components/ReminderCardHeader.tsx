@@ -1,5 +1,6 @@
 import { ReminderToggleSwitch } from './ReminderToggleSwitch'
 import { ReminderTestButton } from './ReminderTestButton'
+import type { ReminderStrategyId } from '../../shared/reminder-strategies'
 
 /**
  * Header row shared by all four reminder strategy cards in
@@ -42,11 +43,11 @@ export function ReminderCardHeader({
   label: string
   enabled: boolean
   locked: boolean
-  strategyId: string
-  testingStrategy: string | null
+  strategyId: ReminderStrategyId
+  testingStrategy: ReminderStrategyId | null
   running: boolean
   onToggle: (v: boolean) => void
-  onTest: (id: string) => void
+  onTest: (id: ReminderStrategyId) => void
 }) {
   return (
     <div className="flex items-center gap-3">

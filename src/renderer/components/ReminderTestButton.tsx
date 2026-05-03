@@ -22,16 +22,18 @@
  * @param running - Whether a real monitoring session is active.
  * @param onTest - Called with strategyId when the user clicks the button.
  */
+import type { ReminderStrategyId } from '../../shared/reminder-strategies'
+
 export function ReminderTestButton({
   strategyId,
   testingStrategy,
   running,
   onTest,
 }: {
-  strategyId: string
-  testingStrategy: string | null
+  strategyId: ReminderStrategyId
+  testingStrategy: ReminderStrategyId | null
   running: boolean
-  onTest: (id: string) => void
+  onTest: (id: ReminderStrategyId) => void
 }) {
   // Is this specific button's strategy the one currently being tested?
   const isTesting = testingStrategy === strategyId

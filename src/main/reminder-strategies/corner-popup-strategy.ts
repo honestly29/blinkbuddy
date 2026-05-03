@@ -1,13 +1,16 @@
 import { app, BrowserWindow, screen } from 'electron'
 import type { ReminderStrategy } from './types'
 import type { CornerPosition } from '../../shared/ipc-messages'
+import type { ReminderStrategyId } from '../../shared/reminder-strategies'
 
-// Window dimensions and margin are constants: the popup is always the same size, only its corner position changes.
+// Window dimensions and margin are constants: the popup is always the
+// same size, only its corner position changes.
 const POPUP_WIDTH = 300
 const POPUP_HEIGHT = 80
-const MARGIN = 20   
+const MARGIN = 20
 
-// The popup's content is static. It never changes at runtime, so the HTML string is declared once and reused by every instance.
+// The popup's content is static, so the HTML is built once at module
+// load rather than rebuilt each time the window is created.
 const POPUP_HTML = `<!DOCTYPE html>
 <html>
 <head>
@@ -45,7 +48,7 @@ const POPUP_HTML = `<!DOCTYPE html>
 const VALID_CORNERS: CornerPosition[] = ['top-left', 'top-right', 'bottom-left', 'bottom-right']
 
 export class CornerPopupStrategy implements ReminderStrategy {
-  readonly id = 'corner-popup'
+  readonly id: ReminderStrategyId = 'corner-popup'
   private window: BrowserWindow | null = null
   private corner: CornerPosition = 'bottom-right'
 
@@ -64,7 +67,8 @@ export class CornerPopupStrategy implements ReminderStrategy {
     if (typeof options.corner === 'string' && VALID_CORNERS.includes(options.corner as CornerPosition)) {
       this.corner = options.corner as CornerPosition
 
-      // If the popup is already created, move it right away rather than waiting for the next reminder.
+      // If the popup is already created, move it right away rather
+      // than waiting for the next reminder.
       if (this.window && !this.window.isDestroyed()) {
         const { x, y } = this.computePosition(this.corner)
         this.window.setPosition(x, y)
@@ -79,8 +83,9 @@ export class CornerPopupStrategy implements ReminderStrategy {
     this.window = null
   }
 
-  // Converts a corner name into absolute screen coordinates for the popup.
-  // The bounds offset matters for multi-monitor setups because the primary display might not start at (0, 0).
+  // Converts a corner name into absolute screen coordinates. The
+  // bounds offset (bounds.x, bounds.y) matters for multi-monitor
+  // setups where the primary display doesn't start at (0, 0).
   private computePosition(corner: CornerPosition): { x: number; y: number } {
     const bounds = screen.getPrimaryDisplay().bounds
 
@@ -103,7 +108,9 @@ export class CornerPopupStrategy implements ReminderStrategy {
 
     const { x, y } = this.computePosition(this.corner)
 
-    // Chromeless, click-through, always-on-top setup 
+    // Window setup: no title bar or borders (chromeless), transparent,
+    // and floats above other windows. type: 'panel' is a macOS hint
+    // that affects fullscreen and focus behaviour. 
     this.window = new BrowserWindow({
       x, y,
       width: POPUP_WIDTH,
@@ -118,12 +125,19 @@ export class CornerPopupStrategy implements ReminderStrategy {
       webPreferences: { nodeIntegration: false, contextIsolation: true },
     })
 
+    // Click-through so the popup doesn't intercept user input.
     this.window.setIgnoreMouseEvents(true)
+
+    // Keep the popup visible if the user is in a fullscreen app.
     this.window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+
+    // 'screen-saver' is the highest z-level, so nothing else can cover
+    // the popup.
     this.window.setAlwaysOnTop(true, 'screen-saver')
 
-    // macOS bug workaround: setVisibleOnAllWorkspaces(true) hides
-    // the dock icon. Re-registering the dock afterwards restores it
+    // macOS workaround: setVisibleOnAllWorkspaces(true) appears to
+    // hide the dock icon. Calling app.dock.show() afterwards restores
+    // it.
     if (process.platform === 'darwin' && app.dock) {
       app.dock.show()
     }

@@ -1,29 +1,34 @@
 import { app, BrowserWindow, screen } from 'electron'
 import type { ReminderStrategy } from './types'
+import type { ReminderStrategyId } from '../../shared/reminder-strategies'
 
 /**
- * Converts a 6-digit hex string like "#38bdf8" into its red, green, and blue channel values.
- * We need this because the colour picker gives hex but CSS
- * box-shadow needs rgba(...) to include an alpha channel for the opacity.
+ * Converts a 6-digit hex string like "#38bdf8" into red, green, and
+ * blue channel values. Needed because the colour picker gives us hex,
+ * but CSS box-shadow needs rgba(...) to combine the colour with an
+ * alpha channel for the opacity.
  *
- * The parse skips the leading "#" and reads the rest as a base-16 number.
- * The top 8 bits are red, the middle 8 are green, and the bottom 8 are blue.
+ * The parse skips the leading "#" and reads the rest as a base-16
+ * number. The top 8 bits are red, the middle 8 are green, and the
+ * bottom 8 are blue.
  */
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
   const n = parseInt(hex.slice(1), 16)
   return { r: (n >> 16) & 0xff, g: (n >> 8) & 0xff, b: n & 0xff }
 }
 
+
 /**
- * Renders a coloured glow around the edges of the primary display when a reminder fires.
- * The glow lives in a transparent, click-through BrowserWindow
- * that covers the whole screen.
+ * Renders a coloured glow around the edges of the primary display
+ * when a reminder fires. The glow lives in a transparent,
+ * click-through BrowserWindow that covers the whole screen.
  */
 export class ScreenEdgeGlowStrategy implements ReminderStrategy {
-  readonly id = 'screen-edge-glow'
-  // The window is created lazily on the first reminder 
-  // and kept alive after that, so subsequent reminders just call .show() 
-  // cost of a new BrowserWindow every time.
+  readonly id: ReminderStrategyId = 'screen-edge-glow'
+
+  // Created on the first reminder and kept alive after that, so later
+  // reminders just call showInactive() rather than creating a new 
+  // BrowserWindow each time which takes more time.
   private window: BrowserWindow | null = null
   private colour = '#38bdf8'
   private opacity = 0.3
@@ -51,7 +56,9 @@ export class ScreenEdgeGlowStrategy implements ReminderStrategy {
       changed = true
     }
     
-    // If the window already exists, patch its CSS in place instead of reloading the page.
+    // If the window already exists, change just the box-shadow CSS on the
+    // existing page instead of reloading the page from scratch (which would
+    // briefly flicker).
     if (changed && this.window && !this.window.isDestroyed()) {
       const { r, g, b } = hexToRgb(this.colour)
       this.window.webContents.executeJavaScript(
@@ -68,10 +75,11 @@ export class ScreenEdgeGlowStrategy implements ReminderStrategy {
     this.window = null
   }
 
-  // Builds the HTML loaded into the glow window. 
-  // Called once, when the window is first created.
-  // Later colour/opacity changes update the existing DOM
-  // via executeJavaScript rather than rebuilding this string.
+  // Builds the HTML that gets loaded into the glow window. Called once
+  // when the window is first created. Later colour or opacity changes
+  // run JavaScript inside the page (via webContents.executeJavaScript)
+  // to update the existing element's CSS, which is faster than reloading
+  // the whole page and avoids a visual flicker.
   private buildGlowHtml(): string {
     const { r, g, b } = hexToRgb(this.colour)
     return `<!DOCTYPE html>
@@ -99,7 +107,7 @@ export class ScreenEdgeGlowStrategy implements ReminderStrategy {
 </html>`
   }
 
-  // Returns the window, creating it on first call. Subsequent calls return the existing window.
+  // Returns the window, creating it on first call.
   private ensureWindow(): BrowserWindow {
     if (this.window && !this.window.isDestroyed()) {
       return this.window
@@ -119,21 +127,25 @@ export class ScreenEdgeGlowStrategy implements ReminderStrategy {
       webPreferences: { nodeIntegration: false, contextIsolation: true },
     })
 
+    // Make the window click-through so it doesn't intercept user input.
     this.window.setIgnoreMouseEvents(true)
 
-    // `visibleOnFullScreen: true` keeps the glow visible even when the user is in a fullscreen app
+    // visibleOnFullScreen keeps the glow visible if the user is in a
+    // fullscreen app
     this.window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
 
-    // 'screen-saver' is the highest level, so nothing else can cover the glow.
+    // 'screen-saver' is the highest z-level, so nothing else can cover
+    // the glow.
     this.window.setAlwaysOnTop(true, 'screen-saver')
 
-    // macOS bug workaround: setVisibleOnAllWorkspaces(true) hides
-    // the dock icon. Re-registering the dock afterwards restores it
+    // macOS workaround: setVisibleOnAllWorkspaces(true) appears to
+    // hide the dock icon. Calling app.dock.show() afterwards restores
+    // it.
     if (process.platform === 'darwin' && app.dock) {
       app.dock.show()
     }
 
-    // Load the HTML inline via a data: URL.
+    // Load the HTML inline via a data: URL rather than from a file.
     this.window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(this.buildGlowHtml())}`)
 
     return this.window

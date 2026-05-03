@@ -1,6 +1,7 @@
 import { app, BrowserWindow, screen } from 'electron'
 import type { ReminderStrategy } from './types'
 import type { CornerPosition } from '../../shared/ipc-messages'
+import type { ReminderStrategyId } from '../../shared/reminder-strategies'
 
 // --- Layout constants ---
 const POPUP_WIDTH = 400
@@ -69,13 +70,12 @@ var _interval = null;
 function _tick() {
   _count = _count - 1;
   var el = document.getElementById('count');
-  // Clamp the displayed value to 0
+  // Show 0 (not a negative number) and stop the timer once we hit zero.
   if (el) el.textContent = _count < 0 ? 0 : _count;
-  // Stop ticking once we hit zero
   if (_count <= 0 && _interval) { clearInterval(_interval); _interval = null; }
 }
-// Exposed globally so the main process can call it via executeJavaScript
-// to restart the countdown when the window is reused for a later break.
+// Called from the main process via executeJavaScript to restart the
+// countdown when the window is reused for a later break.
 function resetCountdown() {
   _count = ${BREAK_SECONDS};
   var el = document.getElementById('count');
@@ -93,15 +93,19 @@ resetCountdown();
 const VALID_CORNERS: CornerPosition[] = ['top-left', 'top-right', 'bottom-left', 'bottom-right']
 
 export class TwentyTwentyPopupStrategy implements ReminderStrategy {
-  readonly id = 'twenty-twenty-popup'
-  // The BrowserWindow is lazily created on first show and reused while the app is running
+  readonly id: ReminderStrategyId = 'twenty-twenty-popup'
+  // Created on the first break and kept alive after that for reuse.
   private window: BrowserWindow | null = null
   private corner: CornerPosition = 'bottom-right'
-  // Tracks whether the embedded page has finished loading.
+  // True once the popup's HTML and inline script have finished loading.
   private ready = false
 
   onReminderStart(): void {
     const win = this.ensureWindow()
+    // On the first break the page is still loading; the inline
+    // script will start the countdown automatically when ready. On
+    // later breaks the page is already there and we restart the
+    // countdown via the resetCountdown() function.
     if (this.ready) {
       win.webContents.executeJavaScript('resetCountdown()').catch(() => {})
     }
@@ -109,14 +113,17 @@ export class TwentyTwentyPopupStrategy implements ReminderStrategy {
   }
 
   onReminderEnd(): void {
-    // Hide rather than close.
+    // Hide rather than close so the window can be reused on the next
+    // break without rebuilding it (which would be slow).
     if (this.window && !this.window.isDestroyed()) {
       this.window.hide()
     }
   }
 
   configure(options: Record<string, unknown>): void {
-    // Guard against malformed or missing corner values.
+    // Validate the corner before assigning. The input crossed IPC, which
+    // means it could arrive as the wrong type or a misspelled string;
+    // reject anything that isn't one of the four valid corners.
     if (typeof options.corner === 'string' && VALID_CORNERS.includes(options.corner as CornerPosition)) {
       this.corner = options.corner as CornerPosition
 
@@ -136,8 +143,7 @@ export class TwentyTwentyPopupStrategy implements ReminderStrategy {
     this.ready = false
   }
 
-  /**
-   * Compute the popup's top-left (x, y) based on the chosen corner. */
+  // Compute the popup's top-left (x, y) based on the chosen corner. 
   private computePosition(corner: CornerPosition): { x: number; y: number } {
     const bounds = screen.getPrimaryDisplay().bounds
 
@@ -153,14 +159,14 @@ export class TwentyTwentyPopupStrategy implements ReminderStrategy {
     }
   }
 
-  /**
-   * Create the window on first use, or return the existing one. */
+  // Create the window on first use, or return the existing one. 
   private ensureWindow(): BrowserWindow {
     if (this.window && !this.window.isDestroyed()) {
       return this.window
     }
 
-    // Reset ready flag
+    // Reset to false because we're about to load a fresh page; the
+    // did-finish-load handler will set it back to true once ready.
     this.ready = false
 
     const { x, y } = this.computePosition(this.corner)
@@ -183,11 +189,18 @@ export class TwentyTwentyPopupStrategy implements ReminderStrategy {
       },
     })
 
+    // Click-through so the popup doesn't intercept user input.
     this.window.setIgnoreMouseEvents(true)
+
+    // Keep the popup visible if the user is in a fullscreen app.
     this.window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+
+    // 'screen-saver' is the highest z-level, so nothing else can cover
+    // the popup.
     this.window.setAlwaysOnTop(true, 'screen-saver')
-    // macOS bug workaround: setVisibleOnAllWorkspaces(true) can cause the dock icon to vanish.
-    // Calling app.dock.show() re-registers it.
+    
+    // macOS workaround: setVisibleOnAllWorkspaces(true) appears to hide
+    // the dock icon. Calling app.dock.show() afterwards restores it.
     if (process.platform === 'darwin' && app.dock) {
       app.dock.show()
     }
