@@ -2,7 +2,6 @@
 // Consumers can import everything from './reminder-strategies' instead
 // of reaching into individual files.
 export { ReminderDispatcher } from './reminder-dispatcher'
-export { OverlayReminderStrategy } from './overlay-strategy'
 export { ScreenEdgeGlowStrategy } from './screen-edge-glow-strategy'
 export { CornerPopupStrategy } from './corner-popup-strategy'
 export { AudioCueStrategy } from './audio-cue-strategy'

@@ -24,7 +24,7 @@ const CORNERS: { value: CornerPosition; label: string }[] = [
 
 
 /**
- * Settings panel for the four reminder strategies.
+ * Settings panel for the three reminder strategies.
  *
  * Renders one card per strategy. Each card has a shared header 
  * (label + on/off toggle + test button via ReminderCardHeader)
@@ -69,7 +69,6 @@ export function ReminderSettingsPanel({ running }: { running: boolean }) {
   // Count how many strategies are currently enabled. Used to decide
   // whether to lock the last enabled toggle.
   let enabledCount = 0
-  if (p.overlay.enabled) enabledCount++
   if (p.screenEdgeGlow.enabled) enabledCount++
   if (p.cornerPopup.enabled) enabledCount++
   if (p.audioCue.enabled) enabledCount++
@@ -93,23 +92,7 @@ export function ReminderSettingsPanel({ running }: { running: boolean }) {
           {testError}
         </div>
       )}
-
       <div className="space-y-3">
-        {/* In-app overlay - only an on/off toggle,
-            no extra controls. */}
-        <div className="rounded-lg bg-gray-700/50 p-3">
-          <ReminderCardHeader
-            label="In-app overlay"
-            enabled={p.overlay.enabled}
-            locked={isLastEnabled(p.overlay.enabled)}
-            strategyId="overlay"
-            testingStrategy={testingStrategy}
-            running={running}
-            onToggle={(v) => update({ overlay: { enabled: v } })}
-            onTest={testStrategy}
-          />
-        </div>
-
         {/* Screen edge glow: header + colour picker + opacity slider when
             enabled. */}
         <div className="rounded-lg bg-gray-700/50 p-3 space-y-3">

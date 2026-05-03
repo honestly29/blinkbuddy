@@ -17,7 +17,6 @@ const mockListCameras = vi.fn().mockResolvedValue([])
 const mockSetPreview = vi.fn().mockResolvedValue(undefined)
 const mockGetSessionHistory = vi.fn().mockResolvedValue([])
 const mockGetReminderPreferences = vi.fn().mockResolvedValue({
-  overlay: { enabled: true },
   screenEdgeGlow: { enabled: true, colour: '#38bdf8', opacity: 0.3 },
   cornerPopup: { enabled: true, corner: 'bottom-right' },
   audioCue: { enabled: true, soundFile: 'dragon-studio-ding.mp3', volume: 0.5 },
@@ -35,7 +34,6 @@ function makeStateUpdate(overrides: Partial<StateUpdate> = {}): StateUpdate {
     sessionDurationMs: 0,
     faceDetected: false,
     reminderState: 'idle',
-    shouldShowReminder: false,
     twentyTwentyState: { phase: 'idle', timeUntilBreakMs: 0, breakTimeRemainingMs: 0 },
     remindersTriggered: 0,
     ...overrides,
@@ -52,7 +50,6 @@ beforeEach(() => {
   mockSetPreview.mockClear()
   mockGetSessionHistory.mockClear().mockResolvedValue([])
   mockGetReminderPreferences.mockClear().mockResolvedValue({
-    overlay: { enabled: true },
     screenEdgeGlow: { enabled: true, colour: '#38bdf8', opacity: 0.3 },
     cornerPopup: { enabled: true, corner: 'bottom-right' },
     audioCue: { enabled: true, soundFile: 'dragon-studio-ding.mp3', volume: 0.5 },
@@ -125,34 +122,6 @@ describe('App', () => {
     expect(screen.getByText('42')).toBeDefined()
     expect(screen.getByText('01:05')).toBeDefined()
   })
-
- 
-  it('shows reminder overlay when shouldShowReminder is true', () => {
-    render(<App />)
-
-    act(() => {
-      stateCallback!(makeStateUpdate({
-        running: true,
-        shouldShowReminder: true,
-        reminderState: 'overdue',
-      }))
-    })
-    // Verify the overlay is visible with correct CSS classes
-    const overlay = screen.getByRole('alert')
-    expect(overlay.textContent).toBe('Remember to blink!')
-    expect(overlay.className).toContain('translate-y-0')
-    expect(overlay.className).toContain('opacity-100')
-  })
-
- 
-  it('hides reminder overlay when shouldShowReminder is false', () => {
-    render(<App />)
-    // No state update sent - default state has shouldShowReminder: false
-    const overlay = screen.getByRole('alert')
-    expect(overlay.className).toContain('translate-y-full')
-    expect(overlay.className).toContain('opacity-0')
-  })
-
   
   it('displays error message when error is set', () => {
     render(<App />)

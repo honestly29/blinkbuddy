@@ -10,7 +10,6 @@ export interface BlinkMonitorState {
   sessionDurationMs: number
   faceDetected: boolean
   reminderState: ReminderState
-  shouldShowReminder: boolean
   twentyTwentyState: TwentyTwentyState
   remindersTriggered: number
   error?: string
@@ -24,7 +23,6 @@ const initialState: BlinkMonitorState = {
   sessionDurationMs: 0,
   faceDetected: false,
   reminderState: 'idle',
-  shouldShowReminder: false,
   twentyTwentyState: { phase: 'idle', timeUntilBreakMs: 0, breakTimeRemainingMs: 0 },
   remindersTriggered: 0,
 }
@@ -44,7 +42,6 @@ export function useBlinkMonitor() {
         sessionDurationMs: update.sessionDurationMs,
         faceDetected: update.faceDetected,
         reminderState: update.reminderState,
-        shouldShowReminder: update.shouldShowReminder,
         twentyTwentyState: update.twentyTwentyState,
         remindersTriggered: update.remindersTriggered,
         error: update.error,

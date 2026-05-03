@@ -135,7 +135,6 @@ describe('SessionManager', () => {
       expect(update.type).toBe('state_update')
       expect(update.running).toBe(true)
       expect(update.reminderState).toBe('idle')
-      expect(update.shouldShowReminder).toBe(false)
       expect(update.totalBlinks).toBe(0)
       expect(update.blinksPerMinute).toBe(0)
       expect(update.faceDetected).toBe(false)
@@ -268,7 +267,6 @@ describe('SessionManager', () => {
 
       const update = lastUpdate(sendToRenderer)
       expect(update.reminderState).toBe('idle')
-      expect(update.shouldShowReminder).toBe(false)
     })
 
     it('ignores blink events when not running', () => {
@@ -296,7 +294,6 @@ describe('SessionManager', () => {
 
       const update = lastUpdate(sendToRenderer)
       expect(update.reminderState).toBe('overdue')
-      expect(update.shouldShowReminder).toBe(true)
     })
 
     it('stays IDLE before the window expires', () => {
@@ -307,7 +304,6 @@ describe('SessionManager', () => {
 
       const update = lastUpdate(sendToRenderer)
       expect(update.reminderState).toBe('idle')
-      expect(update.shouldShowReminder).toBe(false)
     })
 
     it('increments remindersTriggered on transition to OVERDUE', () => {
@@ -367,7 +363,6 @@ describe('SessionManager', () => {
 
       const update = lastUpdate(sendToRenderer)
       expect(update.reminderState).toBe('suppressed')
-      expect(update.shouldShowReminder).toBe(false)
       expect(update.faceDetected).toBe(false)
     })
 
@@ -419,14 +414,12 @@ describe('SessionManager', () => {
       // Become overdue
       vi.advanceTimersByTime(10_000)
       expect(lastUpdate(sendToRenderer).reminderState).toBe('overdue')
-      expect(lastUpdate(sendToRenderer).shouldShowReminder).toBe(true)
 
       // Lose face - should suppress
       bridge.emit('event', trackingEvent(false, 10_000))
 
       const update = lastUpdate(sendToRenderer)
       expect(update.reminderState).toBe('suppressed')
-      expect(update.shouldShowReminder).toBe(false)
     })
 
     it('updates faceDetected flag', () => {
@@ -610,13 +603,11 @@ describe('SessionManager', () => {
       // Wait 10 seconds -> overdue
       vi.advanceTimersByTime(10_000)
       expect(lastUpdate(sendToRenderer).reminderState).toBe('overdue')
-      expect(lastUpdate(sendToRenderer).shouldShowReminder).toBe(true)
 
       // Blink -> back to idle
       vi.setSystemTime(10_500)
       bridge.emit('event', blinkEvent(10_500))
       expect(lastUpdate(sendToRenderer).reminderState).toBe('idle')
-      expect(lastUpdate(sendToRenderer).shouldShowReminder).toBe(false)
 
       // Wait another 10 seconds from the blink -> overdue again
       vi.advanceTimersByTime(10_000)
@@ -667,7 +658,6 @@ describe('SessionManager', () => {
       for (const call of sendToRenderer.mock.calls) {
         const update = call[1] as StateUpdate
         expect(update.reminderState).not.toBe('overdue')
-        expect(update.shouldShowReminder).toBe(false)
       }
     })
 
@@ -686,7 +676,6 @@ describe('SessionManager', () => {
       // 10s after confirmation - now overdue.
       vi.advanceTimersByTime(1_000)
       expect(lastUpdate(sendToRenderer).reminderState).toBe('overdue')
-      expect(lastUpdate(sendToRenderer).shouldShowReminder).toBe(true)
     })
 
     it('falls back to starting the clock on first face-detected tracking event', () => {
@@ -730,7 +719,6 @@ describe('SessionManager', () => {
       // Overdue should fire ~10s after the suppressed->idle reset at T=16s,
       vi.advanceTimersByTime(10_000) // now T=26s
       expect(lastUpdate(sendToRenderer).reminderState).toBe('overdue')
-      expect(lastUpdate(sendToRenderer).shouldShowReminder).toBe(true)
     })
   })
 
@@ -944,7 +932,7 @@ describe('SessionManager', () => {
 
     beforeEach(() => {
       // Build a real SessionManager with real dispatchers holding spy strategies.
-      blinkStrategy = createSpyStrategy('overlay')
+      blinkStrategy = createSpyStrategy('screen-edge-glow')
       twentyTwentyStrategy = createSpyStrategy('twenty-twenty-popup')
       blinkDispatcher = new ReminderDispatcher([blinkStrategy])
       twentyTwentyDispatcher = new ReminderDispatcher([twentyTwentyStrategy])
@@ -1011,7 +999,6 @@ describe('SessionManager', () => {
 
       expect(twentyTwentyStrategy.onReminderStart).toHaveBeenCalledTimes(1)
       expect(blinkStrategy.onReminderEnd).toHaveBeenCalledTimes(1)
-      expect(lastUpdate(sendToRenderer).shouldShowReminder).toBe(false)
     })
 
     it('resumes blink reminder after break ends if still overdue', () => {
@@ -1224,7 +1211,7 @@ describe('SessionManager', () => {
         configure: ReturnType<typeof vi.fn>
         dispose: ReturnType<typeof vi.fn>
       } = {
-        id: 'overlay',
+        id: 'screen-edge-glow',
         onReminderStart: vi.fn(),
         onReminderEnd: vi.fn(),
         configure: vi.fn(),

@@ -6,7 +6,6 @@ import { BlinkStatsPanel } from './components/BlinkStatsPanel'
 import { PreviewCanvas } from './components/PreviewCanvas'
 import { SettingsPanel } from './components/SettingsPanel'
 import { StartStopControls } from './components/StartStopControls'
-import { ReminderOverlay } from './components/ReminderOverlay'
 import { ReminderSettingsPanel } from './components/ReminderSettingsPanel'
 import { DataManagementPanel } from './components/DataManagementPanel'
 import { CvsTipsPanel } from './components/CvsTipsPanel'
@@ -23,7 +22,6 @@ function App() {
     totalBlinks,
     sessionDurationMs,
     faceDetected,
-    shouldShowReminder,
     error,
     start,
     stop,
@@ -154,8 +152,6 @@ function App() {
       </main>
 
       <TabBar tabs={TABS} activeTab={activeTab} onTabChange={setActiveTab} />
-
-      <ReminderOverlay visible={shouldShowReminder} />
     </div>
   )
 }

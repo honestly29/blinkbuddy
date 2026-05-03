@@ -3,7 +3,7 @@ import { isReminderStrategyId } from '../../src/shared/reminder-strategies'
 
 describe('isReminderStrategyId', () => {
   it('returns true for a known strategy ID', () => {
-    expect(isReminderStrategyId('overlay')).toBe(true)
+    expect(isReminderStrategyId('screen-edge-glow')).toBe(true)
   })
 
   it('returns false for an unrecognised string', () => {

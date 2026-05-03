@@ -11,17 +11,7 @@
 import { ipcMain, dialog, type BrowserWindow } from 'electron'
 import fs from 'node:fs/promises'
 import { IPC_CHANNELS } from '../shared/ipc-messages'
-import type {
-  StartArgs,
-  SetPreviewArgs,
-  SetTwentyTwentyArgs,
-  UserSettings,
-  SessionSummary,
-  ReminderPreferences,
-  StateUpdate,
-  ExportSessionsResult,
-  ClearSessionsResult,
-} from '../shared/ipc-messages'
+import type { StartArgs, SetPreviewArgs, SetTwentyTwentyArgs, UserSettings, SessionSummary, ReminderPreferences, ExportSessionsResult, ClearSessionsResult } from '../shared/ipc-messages'
 import { buildSessionsCsv, defaultExportFilename } from './csv-export'
 import type { PythonBridge } from './python-bridge'
 import type { SessionManager } from './session-manager'
@@ -30,7 +20,7 @@ import type { SessionLogger } from './session-logger'
 import type { ReminderPreferencesStore } from './reminder-preferences-store'
 import type { CameraInfo } from '../shared/protocol'
 import type { ReminderStrategy } from './reminder-strategies/types'
-import { ReminderDispatcher, OverlayReminderStrategy, ScreenEdgeGlowStrategy, CornerPopupStrategy, AudioCueStrategy } from './reminder-strategies'
+import { ReminderDispatcher, ScreenEdgeGlowStrategy, CornerPopupStrategy, AudioCueStrategy } from './reminder-strategies'
 import { isReminderStrategyId, type ReminderStrategyId, type BlinkReminderStrategyId } from '../shared/reminder-strategies'
 
 
@@ -40,7 +30,6 @@ import { isReminderStrategyId, type ReminderStrategyId, type BlinkReminderStrate
 // user has just enabled, or to build a temporary instance for the 
 // Test Reminder feature.
 const STRATEGY_FACTORIES: Record<BlinkReminderStrategyId, () => ReminderStrategy> = {
-  'overlay': () => new OverlayReminderStrategy(),
   'screen-edge-glow': () => new ScreenEdgeGlowStrategy(),
   'corner-popup': () => new CornerPopupStrategy(),
   'audio-cue': () => new AudioCueStrategy(),
@@ -51,7 +40,6 @@ const STRATEGY_FACTORIES: Record<BlinkReminderStrategyId, () => ReminderStrategy
 // strategy's configure() method.
 function getStrategyConfig(prefs: ReminderPreferences, id: ReminderStrategyId): Record<string, unknown> {
   switch (id) {
-    case 'overlay': return {}
     case 'screen-edge-glow': return { colour: prefs.screenEdgeGlow.colour, opacity: prefs.screenEdgeGlow.opacity }
     case 'corner-popup': return { corner: prefs.cornerPopup.corner }
     case 'audio-cue': return { soundFile: prefs.audioCue.soundFile, volume: prefs.audioCue.volume }
@@ -211,7 +199,6 @@ export function registerIpcHandlers(
     // Reject any request that would disable all four reminder
     // strategies; at least one must remain enabled.
     const enabledCount = [
-      prefs.overlay.enabled,
       prefs.screenEdgeGlow.enabled,
       prefs.cornerPopup.enabled,
       prefs.audioCue.enabled,
@@ -225,12 +212,10 @@ export function registerIpcHandlers(
     reminderPreferencesStore.save(prefs)
 
     // -- Apply each strategy's new settings to the live dispatcher. --
-    applyStrategyPreference(reminderDispatcher, 'overlay', prefs.overlay.enabled, () => new OverlayReminderStrategy(), {})
-
     applyStrategyPreference(reminderDispatcher, 'screen-edge-glow', prefs.screenEdgeGlow.enabled, () => new ScreenEdgeGlowStrategy(), { colour: prefs.screenEdgeGlow.colour, opacity: prefs.screenEdgeGlow.opacity })
-
+    
     applyStrategyPreference(reminderDispatcher, 'corner-popup', prefs.cornerPopup.enabled, () => new CornerPopupStrategy(), { corner: prefs.cornerPopup.corner })
-
+    
     applyStrategyPreference(reminderDispatcher, 'audio-cue', prefs.audioCue.enabled, () => new AudioCueStrategy(), { soundFile: prefs.audioCue.soundFile, volume: prefs.audioCue.volume })
 
     // The 20-20-20 break strategies inherit the corner and volume
@@ -245,33 +230,6 @@ export function registerIpcHandlers(
       throw new Error(`Unknown strategy "${strategyId}"`)
     }
 
-    if (strategyId === 'overlay') {
-      const win = getMainWindow()
-      if (!win || win.isDestroyed()) return
-
-      const overlayTestUpdate: StateUpdate = {
-        type: 'state_update',
-        running: false,
-        reminderState: 'idle',
-        shouldShowReminder: true,
-        blinksPerMinute: 0,
-        totalBlinks: 0,
-        sessionDurationMs: 0,
-        faceDetected: false,
-        twentyTwentyState: { phase: 'idle', timeUntilBreakMs: 0, breakTimeRemainingMs: 0 },
-        remindersTriggered: 0,
-      }
-
-      win.webContents.send(IPC_CHANNELS.STATE_UPDATE, overlayTestUpdate)
-      await new Promise((resolve) => setTimeout(resolve, 3000))
-
-      if (!win.isDestroyed()) {
-        win.webContents.send(IPC_CHANNELS.STATE_UPDATE, { ...overlayTestUpdate, shouldShowReminder: false })
-      }
-      return
-    }
-
-    // -- Non-overlay strategies --
     const factory = (STRATEGY_FACTORIES as Partial<Record<ReminderStrategyId, () => ReminderStrategy>>)[strategyId]
     if (!factory) {
       throw new Error(`Unknown strategy "${strategyId}"`)

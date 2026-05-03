@@ -1,5 +1,5 @@
 /**
- * Three-state reminder machine: IDLE → OVERDUE → SUPPRESSED.
+ * Three-state reminder machine: IDLE -> OVERDUE -> SUPPRESSED.
  *
  * Reminders are ONLY shown in the OVERDUE state.
  * SUPPRESSED hides reminders when face tracking is unavailable.

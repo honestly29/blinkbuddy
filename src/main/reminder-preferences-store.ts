@@ -7,7 +7,6 @@ import type { ReminderPreferences, CornerPosition } from '../shared/ipc-messages
 //   2. When the file is corrupted or missing fields.
 //   3. As a safety net when validation rejects an invalid value.
 export const DEFAULT_REMINDER_PREFERENCES: ReminderPreferences = {
-  overlay: { enabled: true },
   screenEdgeGlow: { enabled: true, colour: '#38bdf8', opacity: 0.3 },
   cornerPopup: { enabled: true, corner: 'bottom-right' },
   audioCue: { enabled: true, soundFile: 'dragon-studio-ding.mp3', volume: 0.5 },
@@ -59,7 +58,6 @@ export class ReminderPreferencesStore {
   // Returns a fresh copy of the defaults.
   private copyDefaults(): ReminderPreferences {
     return {
-      overlay: { ...DEFAULT_REMINDER_PREFERENCES.overlay },
       screenEdgeGlow: { ...DEFAULT_REMINDER_PREFERENCES.screenEdgeGlow },
       cornerPopup: { ...DEFAULT_REMINDER_PREFERENCES.cornerPopup },
       audioCue: { ...DEFAULT_REMINDER_PREFERENCES.audioCue },
@@ -76,14 +74,13 @@ export class ReminderPreferencesStore {
 
     // Validate each reminder type separetly 
     return {
-      overlay: this.validateOverlay(obj.overlay),
       screenEdgeGlow: this.validateScreenEdgeGlow(obj.screenEdgeGlow),
       cornerPopup: this.validateCornerPopup(obj.cornerPopup),
       audioCue: this.validateAudioCue(obj.audioCue),
     }
   }
 
-  private validateOverlay(raw: unknown): ReminderPreferences['overlay'] {
+  private validateScreenEdgeGlow(raw: unknown): ReminderPreferences['screenEdgeGlow'] {
     if (typeof raw !== 'object' || raw === null) {
       return { ...DEFAULT_REMINDER_PREFERENCES.overlay }
     }

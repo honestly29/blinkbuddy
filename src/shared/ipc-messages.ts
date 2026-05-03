@@ -52,12 +52,11 @@ export const IPC_CHANNELS = {
 export type CornerPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
 
 /**
- * User preferences for the four blink reminder strategies. Persisted
+ * User preferences for the three blink reminder strategies. Persisted
  * to disk via ReminderPreferencesStore and applied to the live
  * dispatcher whenever the user changes a setting.
  */
 export interface ReminderPreferences {
-  overlay: { enabled: boolean }
   screenEdgeGlow: { enabled: boolean; colour: string; opacity: number }
   cornerPopup: { enabled: boolean; corner: CornerPosition }
   audioCue: { enabled: boolean; soundFile: string; volume: number }
@@ -146,7 +145,6 @@ export interface StateUpdate {
   type: 'state_update'
   running: boolean
   reminderState: ReminderState
-  shouldShowReminder: boolean
   blinksPerMinute: number
   totalBlinks: number
   sessionDurationMs: number

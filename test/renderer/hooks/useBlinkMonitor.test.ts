@@ -60,7 +60,6 @@ describe('useBlinkMonitor', () => {
     expect(result.current.sessionDurationMs).toBe(0)
     expect(result.current.faceDetected).toBe(false)
     expect(result.current.reminderState).toBe('idle')
-    expect(result.current.shouldShowReminder).toBe(false)
   })
 
 
@@ -76,7 +75,6 @@ describe('useBlinkMonitor', () => {
       sessionDurationMs: 60000,
       faceDetected: true,
       reminderState: 'idle',
-      shouldShowReminder: false,
       twentyTwentyState: { phase: 'idle', timeUntilBreakMs: 0, breakTimeRemainingMs: 0 },
       remindersTriggered: 0,
     }

@@ -33,7 +33,6 @@ describe('ReminderPreferencesStore', () => {
 
   it('round-trips save and load', () => {
     const prefs = {
-      overlay: { enabled: false },
       screenEdgeGlow: { enabled: false, colour: '#ff0000', opacity: 0.8 },
       cornerPopup: { enabled: true, corner: 'top-left' as const },
       audioCue: { enabled: false, soundFile: 'universfield-clear-bell-chime.mp3', volume: 0.3 },
@@ -60,11 +59,11 @@ describe('ReminderPreferencesStore', () => {
   // -- Sub-object level --
 
   it('fills missing sub-objects with defaults', () => {
-    writePrefs({ overlay: { enabled: false } })
+    writePrefs({ cornerPopup: { enabled: false, corner: 'top-left' } })
     const loaded = store.load()
-    expect(loaded.overlay.enabled).toBe(false)
+    expect(loaded.cornerPopup.enabled).toBe(false)
+    expect(loaded.cornerPopup.corner).toBe('top-left')
     expect(loaded.screenEdgeGlow).toEqual(DEFAULT_REMINDER_PREFERENCES.screenEdgeGlow)
-    expect(loaded.cornerPopup).toEqual(DEFAULT_REMINDER_PREFERENCES.cornerPopup)
     expect(loaded.audioCue).toEqual(DEFAULT_REMINDER_PREFERENCES.audioCue)
   })
 
@@ -161,24 +160,16 @@ describe('ReminderPreferencesStore', () => {
     expect(cue.volume).toBe(0.7)
   })
 
-  // -- overlay field validation --
-
-  it('falls back enabled for non-boolean', () => {
-    writePrefs({ overlay: { enabled: 'yes' } })
-    expect(store.load().overlay.enabled).toBe(DEFAULT_REMINDER_PREFERENCES.overlay.enabled)
-  })
-
   // -- Cross-sub-object preservation --
 
   it('preserves valid sub-objects alongside broken ones', () => {
     writePrefs({
-      overlay: { enabled: false },
       screenEdgeGlow: 'broken',
       cornerPopup: { enabled: true, corner: 'top-right' },
       audioCue: null,
     })
     const loaded = store.load()
-    expect(loaded.overlay.enabled).toBe(false)
+    
     expect(loaded.screenEdgeGlow).toEqual(DEFAULT_REMINDER_PREFERENCES.screenEdgeGlow)
     expect(loaded.cornerPopup).toEqual({ enabled: true, corner: 'top-right' })
     expect(loaded.audioCue).toEqual(DEFAULT_REMINDER_PREFERENCES.audioCue)

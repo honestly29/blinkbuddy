@@ -6,7 +6,7 @@ import { registerIpcHandlers } from './ipc-handlers'
 import { SettingsStore } from './settings-store'
 import { ReminderPreferencesStore } from './reminder-preferences-store'
 import { SessionLogger } from './session-logger'
-import { ReminderDispatcher, OverlayReminderStrategy, ScreenEdgeGlowStrategy, CornerPopupStrategy, AudioCueStrategy, TwentyTwentyPopupStrategy, TwentyTwentyAudioStrategy } from './reminder-strategies'
+import { ReminderDispatcher, ScreenEdgeGlowStrategy, CornerPopupStrategy, AudioCueStrategy, TwentyTwentyPopupStrategy, TwentyTwentyAudioStrategy } from './reminder-strategies'
 import type { ReminderStrategy } from './reminder-strategies/types'
 
 let mainWindow: BrowserWindow | null = null
@@ -59,8 +59,10 @@ app.whenReady().then(() => {
 
   const strategies: ReminderStrategy[] = []
 
-  if (prefs.overlay.enabled) {
-    strategies.push(new OverlayReminderStrategy())
+  if (prefs.screenEdgeGlow.enabled) {
+    const s = new ScreenEdgeGlowStrategy()
+    s.configure({ colour: prefs.screenEdgeGlow.colour, opacity: prefs.screenEdgeGlow.opacity })
+    strategies.push(s)
   }
 
   if (prefs.screenEdgeGlow.enabled) {

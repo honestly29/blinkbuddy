@@ -4,7 +4,6 @@ import { ReminderSettingsPanel } from '../../../src/renderer/components/Reminder
 import type { ReminderPreferences } from '../../../src/shared/ipc-messages'
 
 const defaultPrefs: ReminderPreferences = {
-  overlay: { enabled: true },
   screenEdgeGlow: { enabled: true, colour: '#38bdf8', opacity: 0.3 },
   cornerPopup: { enabled: true, corner: 'bottom-right' },
   audioCue: { enabled: true, soundFile: 'dragon-studio-ding.mp3', volume: 0.5 },
@@ -44,22 +43,21 @@ describe('ReminderSettingsPanel', () => {
     expect(screen.getByText('Reminders')).toBeDefined()
   })
 
-  it('renders all four card headings after loading', async () => {
+  it('renders all three card headings after loading', async () => {
     render(<ReminderSettingsPanel running={false} />)
 
     await waitFor(() => {
-      expect(screen.getByText('In-app overlay')).toBeDefined()
       expect(screen.getByText('Screen edge glow')).toBeDefined()
       expect(screen.getByText('Corner popup')).toBeDefined()
       expect(screen.getByText('Audio cue')).toBeDefined()
     })
   })
 
-  it('renders four test buttons', async () => {
+  it('renders three test buttons', async () => {
     render(<ReminderSettingsPanel running={false} />)
 
     await waitFor(() => {
-      expect(screen.getAllByText('Test')).toHaveLength(4)
+      expect(screen.getAllByText('Test')).toHaveLength(3)
     })
   })
 
@@ -67,12 +65,12 @@ describe('ReminderSettingsPanel', () => {
   // Toggle behaviour
   // -------------------------------------------------------------------------
 
-  it('calls updateReminderPreferences when toggling overlay off', async () => {
+  it('calls updateReminderPreferences when toggling screen edge glow off', async () => {
     render(<ReminderSettingsPanel running={false} />)
 
-    await waitFor(() => screen.getByText('In-app overlay'))
+    await waitFor(() => screen.getByText('Screen edge glow'))
 
-    // The overlay toggle is the first toggle switch (green button)
+    // Screen edge glow is the first toggle switch (green button)
     const toggles = screen.getAllByRole('button').filter(
       (b) => b.className.includes('rounded-full'),
     )
@@ -81,78 +79,75 @@ describe('ReminderSettingsPanel', () => {
     await waitFor(() => {
       expect(mockUpdateReminderPreferences).toHaveBeenCalledWith(
         expect.objectContaining({
-          overlay: { enabled: false },
+          screenEdgeGlow: expect.objectContaining({ enabled: false }),
         }),
       )
     })
   })
 
   it('locks the last enabled toggle and prevents clicks', async () => {
-  mockGetReminderPreferences.mockResolvedValue({
-    overlay: { enabled: true },
-    screenEdgeGlow: { ...defaultPrefs.screenEdgeGlow, enabled: false },
-    cornerPopup: { ...defaultPrefs.cornerPopup, enabled: false },
-    audioCue: { ...defaultPrefs.audioCue, enabled: false },
-  })
+    mockGetReminderPreferences.mockResolvedValue({
+      screenEdgeGlow: { ...defaultPrefs.screenEdgeGlow, enabled: true },
+      cornerPopup: { ...defaultPrefs.cornerPopup, enabled: false },
+      audioCue: { ...defaultPrefs.audioCue, enabled: false },
+    })
 
-  render(<ReminderSettingsPanel running={false} />)
+    render(<ReminderSettingsPanel running={false} />)
 
-  await waitFor(() => screen.getByText('In-app overlay'))
+    await waitFor(() => screen.getByText('Screen edge glow'))
 
-  const toggles = screen.getAllByRole('button').filter(
-    (b) => b.className.includes('rounded-full'),
-  )
-  // Overlay is the only enabled toggle -> locked
-  expect(toggles[0]).toHaveProperty('disabled', true)
-  expect(toggles[0].className).toContain('opacity-50')
-
-  fireEvent.click(toggles[0])
-  expect(mockUpdateReminderPreferences).not.toHaveBeenCalled()
-})
-
-it('shows tooltip text near the locked toggle', async () => {
-  mockGetReminderPreferences.mockResolvedValue({
-    overlay: { enabled: true },
-    screenEdgeGlow: { ...defaultPrefs.screenEdgeGlow, enabled: false },
-    cornerPopup: { ...defaultPrefs.cornerPopup, enabled: false },
-    audioCue: { ...defaultPrefs.audioCue, enabled: false },
-  })
-
-  render(<ReminderSettingsPanel running={false} />)
-
-  await waitFor(() => {
-    expect(
-      screen.getByText('At least one reminder must be enabled.'),
-    ).toBeDefined()
-  })
-})
-
-it('unlocks the previously-last toggle when another is enabled', async () => {
-  mockGetReminderPreferences.mockResolvedValue({
-    overlay: { enabled: true },
-    screenEdgeGlow: { ...defaultPrefs.screenEdgeGlow, enabled: false },
-    cornerPopup: { ...defaultPrefs.cornerPopup, enabled: false },
-    audioCue: { ...defaultPrefs.audioCue, enabled: false },
-  })
-
-  render(<ReminderSettingsPanel running={false} />)
-
-  await waitFor(() => screen.getByText('In-app overlay'))
-
-  const getToggles = () =>
-    screen.getAllByRole('button').filter(
+    const toggles = screen.getAllByRole('button').filter(
       (b) => b.className.includes('rounded-full'),
     )
+    // Screen edge glow is the only enabled toggle -> locked
+    expect(toggles[0]).toHaveProperty('disabled', true)
+    expect(toggles[0].className).toContain('opacity-50')
 
-  expect(getToggles()[0]).toHaveProperty('disabled', true)
-
-  // Second toggle (screen edge glow) is disabled-state but not locked - click to enable it
-  fireEvent.click(getToggles()[1])
-
-  await waitFor(() => {
-    expect(getToggles()[0]).toHaveProperty('disabled', false)
+    fireEvent.click(toggles[0])
+    expect(mockUpdateReminderPreferences).not.toHaveBeenCalled()
   })
-})
+
+it('shows tooltip text near the locked toggle', async () => {
+    mockGetReminderPreferences.mockResolvedValue({
+      screenEdgeGlow: { ...defaultPrefs.screenEdgeGlow, enabled: true },
+      cornerPopup: { ...defaultPrefs.cornerPopup, enabled: false },
+      audioCue: { ...defaultPrefs.audioCue, enabled: false },
+    })
+
+    render(<ReminderSettingsPanel running={false} />)
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('At least one reminder must be enabled.'),
+      ).toBeDefined()
+    })
+  })
+
+it('unlocks the previously-last toggle when another is enabled', async () => {
+    mockGetReminderPreferences.mockResolvedValue({
+      screenEdgeGlow: { ...defaultPrefs.screenEdgeGlow, enabled: true },
+      cornerPopup: { ...defaultPrefs.cornerPopup, enabled: false },
+      audioCue: { ...defaultPrefs.audioCue, enabled: false },
+    })
+
+    render(<ReminderSettingsPanel running={false} />)
+
+    await waitFor(() => screen.getByText('Screen edge glow'))
+
+    const getToggles = () =>
+      screen.getAllByRole('button').filter(
+        (b) => b.className.includes('rounded-full'),
+      )
+
+    expect(getToggles()[0]).toHaveProperty('disabled', true)
+
+    // Second toggle (corner popup) is disabled-state but not locked - click to enable it
+    fireEvent.click(getToggles()[1])
+
+    await waitFor(() => {
+      expect(getToggles()[0]).toHaveProperty('disabled', false)
+    })
+  })
 
 it('does not render a prefs-update error banner', async () => {
   mockUpdateReminderPreferences.mockRejectedValue(
@@ -161,7 +156,7 @@ it('does not render a prefs-update error banner', async () => {
 
   render(<ReminderSettingsPanel running={false} />)
 
-  await waitFor(() => screen.getByText('In-app overlay'))
+  await waitFor(() => screen.getByText('Screen edge glow'))
 
   const toggles = screen.getAllByRole('button').filter(
     (b) => b.className.includes('rounded-full'),
@@ -181,12 +176,12 @@ it('does not render a prefs-update error banner', async () => {
   it('calls testReminder with correct strategy ID', async () => {
     render(<ReminderSettingsPanel running={false} />)
 
-    await waitFor(() => screen.getByText('In-app overlay'))
+    await waitFor(() => screen.getByText('Screen edge glow'))
 
     const testButtons = screen.getAllByText('Test')
     fireEvent.click(testButtons[0])
 
-    expect(mockTestReminder).toHaveBeenCalledWith('overlay')
+    expect(mockTestReminder).toHaveBeenCalledWith('screen-edge-glow')
   })
 
   it('shows test error when testReminder rejects', async () => {
@@ -196,7 +191,7 @@ it('does not render a prefs-update error banner', async () => {
 
     render(<ReminderSettingsPanel running={false} />)
 
-    await waitFor(() => screen.getByText('In-app overlay'))
+    await waitFor(() => screen.getByText('Screen edge glow'))
 
     const testButtons = screen.getAllByText('Test')
     fireEvent.click(testButtons[0])
@@ -211,7 +206,7 @@ it('does not render a prefs-update error banner', async () => {
   it('disables test buttons when monitoring is running', async () => {
     render(<ReminderSettingsPanel running={true} />)
 
-    await waitFor(() => screen.getByText('In-app overlay'))
+    await waitFor(() => screen.getByText('Screen edge glow'))
 
     const testButtons = screen.getAllByText('Test')
     for (const btn of testButtons) {

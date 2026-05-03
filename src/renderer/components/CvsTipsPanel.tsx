@@ -58,7 +58,7 @@ export function CvsTipsPanel() {
             before you get a reminder (default is 8 seconds)
           </li>
           <li>
-            Choose which reminder types you'd like: a full-screen overlay, subtle screen edge glow, a corner popup, a sound cue, or any combination.
+            Choose which reminder types you'd like: a subtle screen edge glow, a corner popup, a sound cue, or any combination.
           </li>
           <li>Go to Monitor and press Start</li>
           <li>

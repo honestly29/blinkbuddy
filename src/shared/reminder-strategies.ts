@@ -2,10 +2,10 @@
  * Central registry of reminder strategy IDs used across the app.
  *
  * Why this file exists:
- * The same six strings ("audio-cue", "screen-edge-glow", etc.) used to be
+ * The same five strings ("audio-cue", "screen-edge-glow", etc.) used to be
  * repeated across the strategy classes, the IPC handlers, the renderer
- * components, and the tests. A typo in any one of those places (e.g.
- * "overaly") would compile cleanly and only fail at runtime when the
+ * components, and the tests. A typo in any one of those places 
+ * would compile cleanly and only fail at runtime when the
  * code path that used the wrong string actually ran.
  *
  * Centralising the IDs here means TypeScript treats them as a closed
@@ -23,7 +23,6 @@
  */
 
 export const REMINDER_STRATEGY_IDS = [
-  'overlay',
   'screen-edge-glow',
   'corner-popup',
   'audio-cue',
@@ -38,8 +37,8 @@ export type ReminderStrategyId = typeof REMINDER_STRATEGY_IDS[number]
 
 
 /**
- * The four strategies owned by the blink reminder dispatcher
- * (overlay, screen edge glow, corner popup, audio cue). The two
+ * The three strategies owned by the blink reminder dispatcher
+ * (screen edge glow, corner popup, audio cue). The two
  * 20-20-20 break strategies are not in this list because they are
  * created in src/main/index.ts and run by a different dispatcher.
  *
@@ -50,7 +49,6 @@ export type ReminderStrategyId = typeof REMINDER_STRATEGY_IDS[number]
  * without a matching factory entry.
  */
 export const BLINK_REMINDER_STRATEGY_IDS = [
-  'overlay',
   'screen-edge-glow',
   'corner-popup',
   'audio-cue',

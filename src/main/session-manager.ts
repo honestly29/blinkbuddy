@@ -21,7 +21,7 @@ import type { ReminderState, TwentyTwentyState } from '../domain/types'
 import type { PythonCommand, PythonEvent } from '../shared/protocol'
 import { IPC_CHANNELS } from '../shared/ipc-messages'
 import type { SessionSummary, StateUpdate } from '../shared/ipc-messages'
-import { ReminderDispatcher, OverlayReminderStrategy } from './reminder-strategies'
+import { ReminderDispatcher } from './reminder-strategies'
 
 // ---------------------------------------------------------------------------
 // Dependencies interface (for testability)
@@ -114,7 +114,7 @@ export class SessionManager {
     this.sendToRenderer = deps.sendToRenderer
     // Default 100ms throttle in production; tests pass 0 to disable
     this.throttleMs = deps.throttleMs ?? 100
-    this.reminderDispatcher = deps.reminderDispatcher ?? new ReminderDispatcher([new OverlayReminderStrategy()])
+    this.reminderDispatcher = deps.reminderDispatcher ?? new ReminderDispatcher()
     this.twentyTwentyDispatcher = deps.twentyTwentyDispatcher ?? new ReminderDispatcher()
   }
 
@@ -476,7 +476,6 @@ export class SessionManager {
       type: 'state_update',
       running: this.running,
       reminderState: this.reminderState,
-      shouldShowReminder: this.reminderDispatcher.getStrategy<OverlayReminderStrategy>('overlay')?.active ?? false,
       blinksPerMinute: this.blinkStats.getBlinksPerMinute(now),
       totalBlinks: this.blinkStats.getTotalBlinks(),
       sessionDurationMs: this.sessionStartTime >= 0 ? now - this.sessionStartTime : 0,
