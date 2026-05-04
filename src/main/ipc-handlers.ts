@@ -198,13 +198,12 @@ export function registerIpcHandlers(
   ipcMain.handle(IPC_CHANNELS.UPDATE_REMINDER_PREFERENCES, (_event, prefs: ReminderPreferences) => {
     // Reject any request that would disable all four reminder
     // strategies; at least one must remain enabled.
-    const enabledCount = [
-      prefs.screenEdgeGlow.enabled,
-      prefs.cornerPopup.enabled,
-      prefs.audioCue.enabled,
-    ].filter(Boolean).length
+    const anyEnabled =
+      prefs.screenEdgeGlow.enabled ||
+      prefs.cornerPopup.enabled ||
+      prefs.audioCue.enabled
 
-    if (enabledCount === 0) {
+    if (!anyEnabled) {
       throw new Error('At least one reminder strategy must be enabled')
     }
 

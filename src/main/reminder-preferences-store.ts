@@ -82,20 +82,6 @@ export class ReminderPreferencesStore {
 
   private validateScreenEdgeGlow(raw: unknown): ReminderPreferences['screenEdgeGlow'] {
     if (typeof raw !== 'object' || raw === null) {
-      return { ...DEFAULT_REMINDER_PREFERENCES.overlay }
-    }
-    const obj = raw as Record<string, unknown>
-
-    const enabled =
-      typeof obj.enabled === 'boolean'
-        ? obj.enabled
-        : DEFAULT_REMINDER_PREFERENCES.overlay.enabled
-
-    return { enabled }
-  }
-
-  private validateScreenEdgeGlow(raw: unknown): ReminderPreferences['screenEdgeGlow'] {
-    if (typeof raw !== 'object' || raw === null) {
       return { ...DEFAULT_REMINDER_PREFERENCES.screenEdgeGlow }
     }
     const obj = raw as Record<string, unknown>

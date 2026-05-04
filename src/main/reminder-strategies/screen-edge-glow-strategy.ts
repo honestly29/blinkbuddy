@@ -12,9 +12,12 @@ import type { ReminderStrategyId } from '../../shared/reminder-strategies'
  * number. The top 8 bits are red, the middle 8 are green, and the
  * bottom 8 are blue.
  */
-function hexToRgb(hex: string): { r: number; g: number; b: number } {
-  const n = parseInt(hex.slice(1), 16)
-  return { r: (n >> 16) & 0xff, g: (n >> 8) & 0xff, b: n & 0xff }
+function hexToRgb(hex: string) {
+  return {
+    r: parseInt(hex.slice(1, 3), 16),
+    g: parseInt(hex.slice(3, 5), 16),
+    b: parseInt(hex.slice(5, 7), 16),
+  }
 }
 
 
