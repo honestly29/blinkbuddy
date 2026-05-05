@@ -252,6 +252,13 @@ blinkbuddy/
 ```
 ---
 
+## Demo Recording
+**Note on the demo recording:** The demo predates two changed made to the project. 
+First, the "window overlay" reminder strategy shown in the demo has been removed (the
+current build has three blink reminder strategies: screen edge glow, corner popup, and audio cue). Second, the camera preview has been simplified to draw only the eye contours, where the demo shows a face oval, lip contour, and eye contours. The rest of the demo accurately reflects the submitted build.
+
+---
+
 ## Acknowledgements
 
 - Blink detection built on [MediaPipe Face Landmarker](https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker) and [OpenCV](https://opencv.org/).
