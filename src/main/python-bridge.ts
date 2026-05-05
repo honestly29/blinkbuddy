@@ -1,8 +1,12 @@
 /**
  * Spawns the Python blink-detection service as a child process and
- * communicates via stdin/stdout JSON Lines.
+ * provides a typed interface for sending it commands and receiving
+ * blink/tracking events back.
+ *
+ * Communication is over the child's stdin (commands going to Python)
+ * and stdout (events coming back). Each message is a single JSON
+ * object on its own line, separated by newlines.
  */
-
 import { spawn, type ChildProcess } from 'node:child_process'
 import path from 'node:path'
 import { createInterface, type Interface } from 'node:readline'
@@ -17,8 +21,8 @@ export interface PythonBridgeEvents {
 
 export interface PythonBridgeOptions {
   isPackaged: boolean
-  resourcesPath: string
-  projectRoot: string
+  resourcesPath: string  // Used in packaged mode
+  projectRoot: string    // Used in dev mode
 }
 
 export class PythonBridge extends EventEmitter<PythonBridgeEvents> {
@@ -96,21 +100,21 @@ export class PythonBridge extends EventEmitter<PythonBridgeEvents> {
 
   /**
    * Gracefully stop the Python process:
-   * 1. Send a "stop" command (if running detection)
-   * 2. Close stdin (causes Python's readline loop to exit)
-   * 3. Wait up to 3 seconds, then SIGTERM
+   * 1. Close stdin (causes Python's readline loop to exit cleanly).
+   * 2. Wait up to 3 seconds for the process to exit on its own.
+   * 3. If it hasn't exited by then, send SIGTERM to force it.
    */
   async kill(): Promise<void> {
     if (!this.process) return
-
     const proc = this.process
 
-    // Close stdin so Python's `for line in stdin` loop ends
+    // Close stdin to trigger Python's clean shutdown 
     proc.stdin?.end()
 
-    // Wait for graceful exit, then force-kill
     await new Promise<void>((resolve) => {
       const timeout = setTimeout(() => {
+        // 3s gives Python time to release the camera and emit any final
+        // events. After that, force-kill rather than hang on shutdown.
         if (proc.exitCode === null) {
           console.log('[PythonBridge] Force-killing Python process')
           proc.kill('SIGTERM')
@@ -128,7 +132,9 @@ export class PythonBridge extends EventEmitter<PythonBridgeEvents> {
   }
 
   /**
-   * Synchronous kill for use in process.on('exit') where async is not available.
+   * Synchronous kill for Electron's quit handlers, where async work isn't
+   * allowed. Skips the graceful shutdown that kill() does and goes
+   * straight to SIGTERM, since there's no time to wait during quit.
    */
   killSync(): void {
     if (!this.process) return

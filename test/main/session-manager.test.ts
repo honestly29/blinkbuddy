@@ -61,7 +61,7 @@ function blinkEvent(timestamp: number): PythonEvent {
 }
 
 function trackingEvent(faceDetected: boolean, timestamp: number): PythonEvent {
-  return { type: 'tracking_status', face_detected: faceDetected, quality: 0.9, fps: 30, timestamp }
+  return { type: 'tracking_status', face_detected: faceDetected, quality: 0.9, timestamp }
 }
 
 /** Extract the most recent StateUpdate sent to the renderer. */
@@ -495,57 +495,6 @@ describe('SessionManager', () => {
     })
   })
 
-  // -----------------------------------------------------------------------
-  // 20-20-20 integration
-  // -----------------------------------------------------------------------
-
-  describe('20-20-20 integration', () => {
-    it('starts timer when enabled', () => {
-      manager.start({ ...DEFAULT_CONFIG, twentyTwentyEnabled: true })
-
-      const update = lastUpdate(sendToRenderer)
-      expect(update.twentyTwentyState.phase).toBe('waiting')
-      expect(update.twentyTwentyState.timeUntilBreakMs).toBeGreaterThan(0)
-    })
-
-    it('does not start timer when disabled', () => {
-      manager.start({ ...DEFAULT_CONFIG, twentyTwentyEnabled: false })
-
-      const update = lastUpdate(sendToRenderer)
-      expect(update.twentyTwentyState.phase).toBe('idle')
-      expect(update.twentyTwentyState.timeUntilBreakMs).toBe(0)
-    })
-
-    it('includes twenty-twenty state in tick updates', () => {
-      manager.start({ ...DEFAULT_CONFIG, twentyTwentyEnabled: true })
-      sendToRenderer.mockClear()
-
-      vi.advanceTimersByTime(1000)
-
-      const update = lastUpdate(sendToRenderer)
-      expect(update.twentyTwentyState).toBeDefined()
-      expect(update.twentyTwentyState.phase).toBe('waiting')
-    })
-
-    it('transitions to break after 20 minutes', () => {
-      startWithConfirm(manager, { ...DEFAULT_CONFIG, twentyTwentyEnabled: true }, bridge)
-
-      // Advance 20 minutes
-      vi.advanceTimersByTime(20 * 60 * 1000)
-
-      const update = lastUpdate(sendToRenderer)
-      expect(update.twentyTwentyState.phase).toBe('break_active')
-      expect(update.twentyTwentyState.breakTimeRemainingMs).toBeGreaterThan(0)
-    })
-
-    it('stops timer on session stop', () => {
-      manager.start({ ...DEFAULT_CONFIG, twentyTwentyEnabled: true })
-      manager.stop()
-
-      const update = lastUpdate(sendToRenderer)
-      expect(update.twentyTwentyState.phase).toBe('idle')
-    })
-  })
 
   // -----------------------------------------------------------------------
   // Session summary
@@ -952,11 +901,9 @@ describe('SessionManager', () => {
     })
 
     it('fires onReminderStart on the 20-20-20 dispatcher when break begins', () => {
-      // blinkWindowSeconds:999 prevents a blink reminder from firing
-      // during the 20-minute wait
       startWithConfirm(
         wiredManager,
-        { ...DEFAULT_CONFIG, twentyTwentyEnabled: true, blinkWindowSeconds: 999 },
+        { ...DEFAULT_CONFIG, twentyTwentyEnabled: true },
         bridge,
       )
 
@@ -968,7 +915,7 @@ describe('SessionManager', () => {
     it('fires onReminderEnd on the 20-20-20 dispatcher when break ends', () => {
       startWithConfirm(
         wiredManager,
-        { ...DEFAULT_CONFIG, twentyTwentyEnabled: true, blinkWindowSeconds: 999 },
+        { ...DEFAULT_CONFIG, twentyTwentyEnabled: true },
         bridge,
       )
 
@@ -1042,7 +989,7 @@ describe('SessionManager', () => {
       // Stopping mid-break must clean up the popup and play the end sound
       startWithConfirm(
         wiredManager,
-        { ...DEFAULT_CONFIG, twentyTwentyEnabled: true, blinkWindowSeconds: 999 },
+        { ...DEFAULT_CONFIG, twentyTwentyEnabled: true },
         bridge,
       )
 
@@ -1054,10 +1001,6 @@ describe('SessionManager', () => {
       expect(twentyTwentyStrategy.onReminderEnd).toHaveBeenCalledTimes(1)
     })
   })
-
-  // -----------------------------------------------------------------------
-  // Mid-session 20-20-20 toggle
-  // -----------------------------------------------------------------------
 
   describe('mid-session 20-20-20 toggle', () => {
     function createSpyStrategy(id: string, withCancel: boolean): ReminderStrategy & {
@@ -1111,15 +1054,16 @@ describe('SessionManager', () => {
     })
 
     it('enable from a disabled session starts a fresh 20-minute cycle', () => {
-      wiredManager.start({ ...DEFAULT_CONFIG, twentyTwentyEnabled: false })
-      expect(lastUpdate(sendToRenderer).twentyTwentyState.phase).toBe('idle')
-      sendToRenderer.mockClear()
+      startWithConfirm(wiredManager, { ...DEFAULT_CONFIG, twentyTwentyEnabled: false }, bridge)
 
       wiredManager.setTwentyTwentyEnabled(true)
 
-      const update = lastUpdate(sendToRenderer)
-      expect(update.twentyTwentyState.phase).toBe('waiting')
-      expect(update.twentyTwentyState.timeUntilBreakMs).toBeGreaterThan(TWENTY_MINUTES_MS - 100)
+      // Break should fire ~20 minutes after enable, not sooner
+      vi.advanceTimersByTime(TWENTY_MINUTES_MS - 1000)
+      expect(popupStrategy.onReminderStart).not.toHaveBeenCalled()
+
+      vi.advanceTimersByTime(2000)
+      expect(popupStrategy.onReminderStart).toHaveBeenCalledTimes(1)
     })
 
     it('enable does not reset the cycle if already waiting', () => {
@@ -1127,20 +1071,18 @@ describe('SessionManager', () => {
 
       // Advance 10 minutes into the cycle
       vi.advanceTimersByTime(10 * 60 * 1000)
-      const beforeMs = lastUpdate(sendToRenderer).twentyTwentyState.timeUntilBreakMs
+      wiredManager.setTwentyTwentyEnabled(true) // should NOT reset the cycle
 
-      wiredManager.setTwentyTwentyEnabled(true)
-
-      const afterMs = lastUpdate(sendToRenderer).twentyTwentyState.timeUntilBreakMs
-      // Cycle was preserved - remaining time is still ~10 minutes (not ~20 as a reset would give)
-      expect(afterMs).toBe(beforeMs)
-      expect(afterMs).toBeLessThan(TWENTY_MINUTES_MS - 100)
+      // If cycle was preserved, break fires after another 10 minutes (total = 20).
+      // If cycle was reset, no break would fire here - it'd take a full 20 min.
+      vi.advanceTimersByTime(10 * 60 * 1000)
+      expect(popupStrategy.onReminderStart).toHaveBeenCalledTimes(1)
     })
 
     it('disable during break_active silently cancels the popup and suppresses the end cue', () => {
       startWithConfirm(
         wiredManager,
-        { ...DEFAULT_CONFIG, twentyTwentyEnabled: true, blinkWindowSeconds: 999 },
+        { ...DEFAULT_CONFIG, twentyTwentyEnabled: true },
         bridge,
       )
 
@@ -1157,8 +1099,6 @@ describe('SessionManager', () => {
       // Audio cue is suppressed: onReminderCancel fires, onReminderEnd does NOT
       expect(audioStrategy.onReminderCancel).toHaveBeenCalledTimes(1)
       expect(audioStrategy.onReminderEnd).not.toHaveBeenCalled()
-      // Renderer sees the phase update
-      expect(lastUpdate(sendToRenderer).twentyTwentyState.phase).toBe('idle')
     })
 
     it('disable during waiting phase stops the timer with no dispatcher side effects', () => {
@@ -1171,7 +1111,6 @@ describe('SessionManager', () => {
       expect(popupStrategy.onReminderStart).not.toHaveBeenCalled()
       expect(popupStrategy.onReminderEnd).not.toHaveBeenCalled()
       expect(audioStrategy.onReminderCancel).not.toHaveBeenCalled()
-      expect(lastUpdate(sendToRenderer).twentyTwentyState.phase).toBe('idle')
     })
 
     it('disable is no-op when already idle', () => {
@@ -1187,7 +1126,7 @@ describe('SessionManager', () => {
     it('disable + re-enable resets the cycle fresh, not residual time', () => {
       startWithConfirm(
         wiredManager,
-        { ...DEFAULT_CONFIG, twentyTwentyEnabled: true, blinkWindowSeconds: 999 },
+        { ...DEFAULT_CONFIG, twentyTwentyEnabled: true },
         bridge,
       )
 
@@ -1198,10 +1137,13 @@ describe('SessionManager', () => {
       wiredManager.setTwentyTwentyEnabled(false)
       wiredManager.setTwentyTwentyEnabled(true)
 
-      const update = lastUpdate(sendToRenderer)
-      expect(update.twentyTwentyState.phase).toBe('waiting')
-      // Full cycle restarts - timeUntilBreakMs is near 20 minutes, not ~5
-      expect(update.twentyTwentyState.timeUntilBreakMs).toBeGreaterThan(TWENTY_MINUTES_MS - 100)
+      // If reset worked, the break fires ~20 minutes after re-enable.
+      // If residual time was preserved, it would fire after only ~5 minutes.
+      vi.advanceTimersByTime(10 * 60 * 1000) // 10 min after re-enable
+      expect(popupStrategy.onReminderStart).not.toHaveBeenCalled()
+
+      vi.advanceTimersByTime(10 * 60 * 1000) // 20 min after re-enable
+      expect(popupStrategy.onReminderStart).toHaveBeenCalledTimes(1)
     })
 
     it('blink reminder resumes on the next tick after a mid-break disable', () => {

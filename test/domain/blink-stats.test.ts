@@ -8,22 +8,20 @@ describe('BlinkStatsTracker', () => {
     stats = new BlinkStatsTracker()
   })
 
-  // -----------------------------------------------------------------------
-  // getBlinksPerMinute
-  // -----------------------------------------------------------------------
+
 
   describe('getBlinksPerMinute', () => {
     it('returns 0 with no blinks recorded', () => {
       expect(stats.getBlinksPerMinute(10_000)).toBe(0)
     })
 
-    it('records 10 blinks in 30 seconds → returns 10 (count in rolling window)', () => {
+    it('records 10 blinks in 30 seconds -> returns 10 (count in rolling window)', () => {
       const start = 0
       // 10 blinks spread over 30 seconds
       for (let i = 0; i < 10; i++) {
         stats.recordBlink(start + i * 3_000)
       }
-      // Query at 30s — all 10 blinks are within the 60s window
+      // Query at 30s - all 10 blinks are within the 60s window
       expect(stats.getBlinksPerMinute(30_000)).toBe(10)
     })
 
@@ -37,8 +35,8 @@ describe('BlinkStatsTracker', () => {
         stats.recordBlink(62_000 + i * 1_000)
       }
 
-      // Query at t=65s — only the 3 recent blinks should be in window
-      // (the first 5 at t=0–4s are older than 60s from now=65s)
+      // Query at t=65s - only the 3 recent blinks should be in window
+      // (the first 5 at t=0-4s are older than 60s from now=65s)
       expect(stats.getBlinksPerMinute(65_000)).toBe(3)
     })
 
@@ -47,14 +45,11 @@ describe('BlinkStatsTracker', () => {
       for (let i = 0; i < 20; i++) {
         stats.recordBlink(i * 2_500)
       }
-      // Query at 50s — all 20 within the 60s window
+      // Query at 50s - all 20 within the 60s window
       expect(stats.getBlinksPerMinute(50_000)).toBe(20)
     })
   })
 
-  // -----------------------------------------------------------------------
-  // getTotalBlinks
-  // -----------------------------------------------------------------------
 
   describe('getTotalBlinks', () => {
     it('returns 0 initially', () => {
@@ -89,9 +84,7 @@ describe('BlinkStatsTracker', () => {
     })
   })
 
-  // -----------------------------------------------------------------------
-  // getInterBlinkIntervals
-  // -----------------------------------------------------------------------
+
 
   describe('getInterBlinkIntervals', () => {
     it('returns empty array with no blinks', () => {
@@ -124,9 +117,7 @@ describe('BlinkStatsTracker', () => {
     })
   })
 
-  // -----------------------------------------------------------------------
-  // reset
-  // -----------------------------------------------------------------------
+
 
   describe('reset', () => {
     it('clears all data', () => {

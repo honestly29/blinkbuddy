@@ -49,7 +49,6 @@ export interface TrackingStatusEvent {
   type: 'tracking_status'
   face_detected: boolean
   quality: number
-  fps: number
   timestamp: number
 }
 

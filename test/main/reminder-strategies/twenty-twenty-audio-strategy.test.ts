@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ---------------------------------------------------------------------------
-// Mock Electron and Node modules — factories must not reference top-level vars
+// Mock Electron and Node modules 
 // ---------------------------------------------------------------------------
 
 vi.mock('electron', () => {
@@ -250,7 +250,7 @@ describe('TwentyTwentyAudioStrategy', () => {
   })
 
   // -------------------------------------------------------------------------
-  // onReminderCancel() — silent dismissal
+  // onReminderCancel() - silent dismissal
   // -------------------------------------------------------------------------
 
   it('onReminderCancel does NOT play the end cue after load', () => {
@@ -265,7 +265,7 @@ describe('TwentyTwentyAudioStrategy', () => {
 
   it('onReminderCancel drops any pending cue queued before load', () => {
     strategy.onReminderStart()
-    // Page not loaded yet — playStart is queued
+    // Page not loaded yet - playStart is queued
     strategy.onReminderCancel()
 
     // Simulate load after cancellation

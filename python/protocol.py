@@ -1,4 +1,12 @@
-"""JSON Lines serialisation and deserialisation helpers for IPC protocol."""
+"""Helpers for converting messages to and from the JSON-line format used
+between Electron and the Python service.
+
+Messages travel as one JSON object per line of stdin/stdout. The
+serialise() function packs a Python dict into that format (compact JSON
+plus a trailing newline); deserialise() unpacks a line back into a dict.
+
+Callers use the make_*() helpers (one per event type) instead of building dicts by hand, the helpers guarantee the right field names and types every time."
+"""
 
 import json
 
@@ -17,13 +25,16 @@ EVENT_TYPES = frozenset({
 
 
 def serialise(message):
-    """Serialise a message dict to a JSON Lines string (with trailing newline).
+    """Serialise a message dict to a single JSON line.
+
+    Produces compact JSON (no whitespace between fields) plus a trailing
+    newline, which is the line separator the Electron side parses on.
 
     Args:
         message: A dict with at least a 'type' key.
 
     Returns:
-        A JSON string terminated by '\\n'.
+        A JSON string terminated by '\\n', ready to write to stdout.
 
     Raises:
         ValueError: If the message is not a dict or has no 'type' key.
@@ -36,7 +47,12 @@ def serialise(message):
 
 
 def deserialise(line):
-    """Deserialise a JSON Lines string into a message dict.
+    """Parse a single JSON line back into a message dict.
+
+    Strips any trailing whitespace or newlines internally, so callers
+    can pass lines straight from stdin without cleaning them up first.
+    Validates that the parsed result is a dict with a 'type' field;
+    anything else raises ValueError.
 
     Args:
         line: A string containing a single JSON object (with or without
@@ -67,10 +83,15 @@ def deserialise(line):
 
 
 def deserialise_command(line):
-    """Deserialise and validate a command (Electron -> Python).
+    """Parse and validate a command from Electron.
+
+    Wraps deserialise() with an extra check that the message's type is
+    one of the four known command types. Anything else (typo, unknown
+    command) raises ValueError so the caller can emit an INVALID_COMMAND
+    error rather than silently dispatching nothing.
 
     Args:
-        line: A JSON Lines string.
+        line: A JSON line.
 
     Returns:
         A dict with a valid command 'type'.
@@ -88,7 +109,7 @@ def make_blink_event(timestamp, ear_value, duration_ms=None):
     """Create a blink_event message.
 
     Args:
-        timestamp: Epoch milliseconds.
+        timestamp: Unix timestamp in milliseconds.
         ear_value: EAR at blink peak.
         duration_ms: Optional blink duration in milliseconds.
     """
@@ -101,20 +122,18 @@ def make_blink_event(timestamp, ear_value, duration_ms=None):
     return msg
 
 
-def make_tracking_status(face_detected, quality, fps, timestamp):
+def make_tracking_status(face_detected, quality, timestamp):
     """Create a tracking_status message.
 
     Args:
         face_detected: Whether a face is currently tracked.
         quality: MediaPipe confidence 0-1.
-        fps: Current processing FPS.
-        timestamp: Epoch milliseconds.
+        timestamp: Unix timestamp in milliseconds.
     """
     return {
         "type": "tracking_status",
         "face_detected": face_detected,
         "quality": quality,
-        "fps": fps,
         "timestamp": timestamp,
     }
 
@@ -126,7 +145,7 @@ def make_preview_frame(data, width, height, timestamp):
         data: Base64-encoded JPEG string.
         width: Frame width in pixels.
         height: Frame height in pixels.
-        timestamp: Epoch milliseconds.
+        timestamp: Unix timestamp in milliseconds.
     """
     return {
         "type": "preview_frame",

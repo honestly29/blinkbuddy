@@ -8,11 +8,11 @@ BlinkBuddy uses real-time facial landmark detection to track blink frequency dur
 
 ## Core features
 
-- **Real-time blink detection** using MediaPipe Face Mesh and OpenCV, running as a local Python service. Eye Aspect Ratio (EAR) is computed per frame to detect blinks.
-- **Customisable blink reminders** with four independently toggleable reminder strategies: a window overlay, a subtle screen edge glow, a corner popup, and an audio cue. Any combination can be active at once.
+- **Real-time blink detection** using MediaPipe Face Landmark and OpenCV, running as a local Python service. Eye Aspect Ratio (EAR) is computed per frame to detect blinks.
+- **Customisable blink reminders** with three independently toggleable reminder strategies: a subtle screen edge glow, a corner popup, and an audio cue. Any combination can be active at once.
 - **Adjustable blink window** (default 8 seconds). If you go longer than the window without blinking, a reminder fires and clears automatically as soon as your next blink is detected.
 - **20-20-20 break reminders** implementing the guideline of looking at something 20 feet away for 20 seconds every 20 minutes.
-- **Statistics dashboard** with overview cards (average blink rate, total sessions, reminders fired, healthy session rate), a blink rate trend chart showing the last 8 days of data, and a grouped session history.
+- **Statistics dashboard** with overview cards (average blink rate, total sessions, total reminders, healthy session rate), a blink rate trend chart showing the last 8 days of data, and a grouped session history.
 - **CSV export** of session data for users who want to analyse their history externally.
 - **Privacy by design**: all facial landmark detection runs locally. No frames are recorded, stored, or transmitted. The optional camera preview streams only while explicitly enabled.
 
@@ -107,9 +107,8 @@ much faster.
 | `npm run build` | Compile the TypeScript renderer via Vite |
 | `npm test` | Run the TypeScript test suite via Vitest |
 | `npm run build:python` | Bundle the Python service into a standalone executable with PyInstaller |
-| `npm run build:renderer` | Compile the TypeScript renderer via Vite |
 | `npm run build:electron` | Package the `.app` and `.dmg` via electron-builder |
-| `npm run dist` | Produce a packaged `.dmg`: runs `build:python`, `build:renderer`, and `build:electron` in sequence |
+| `npm run dist` | Produce a packaged `.dmg`: runs `build:python`, `build`, and `build:electron` in sequence |
 | `npm run populate-test-data` | Seed the session history with synthetic test sessions (useful for UI testing) |
 
 ### Running the tests
@@ -126,9 +125,9 @@ npm test
 
 ## How to use BlinkBuddy
 
-1. **Choose your camera and reminder settings.** Open the Settings tab. Pick your camera from the dropdown. Choose which reminder strategies you want active: window overlay, screen edge glow, corner popup, audio cue, or any combination. Adjust the blink window (default 8 seconds) if desired.
+1. **Choose your camera and reminder settings.** Open the Settings tab. Pick your camera from the dropdown. Choose which reminder strategies you want active: screen edge glow, corner popup, audio cue, or any combination. Adjust the blink window (default 8 seconds) if desired.
 2. **Start monitoring.** Go to the Monitor tab and click "Start Monitoring". The face detection indicator turns green when your face is detected. Your blink count and blinks-per-minute update in real time.
-3. **Enable camera preview (optional).** Click "Show camera preview" to see the live webcam feed with face mesh overlay. This is useful for confirming that detection is working. 
+3. **Enable camera preview (optional).** Click "Show camera preview" to see the live webcam feed with eye-contour overlay. This is useful for confirming that detection is working. 
 4. **React to reminders.** When you go longer than the blink window without blinking, the reminders you enabled will fire. Blinking clears them automatically.
 5. **Review your stats.** After using BlinkBuddy for a while, check the Stats tab to see your overall blink rate, trend over the last 8 days, and session history grouped by date.
 6. **Read the Tips & Info tab** for background on Computer Vision Syndrome, the 20-20-20 rule, and ergonomic recommendations.
@@ -152,6 +151,8 @@ Three files live there:
 **No video, frames, or raw biometric data is ever persisted.** Only derived statistics (blink counts, timestamps, durations, configuration) are saved.
 
 From within the app, the Settings tab includes a "Data Management" panel with two buttons: **Export to CSV** (saves your session history as a spreadsheet file) and **Clear All Data** (permanently deletes all stored sessions).
+
+> **Note for user testing builds:** the **Clear All Data** button is gated behind a dev flag (`ENABLE_CLEAR_DATA` in `src/renderer/components/DataManagementPanel.tsx`) and should be set to `false` before producing builds for study participants. This prevents participants accidentally wiping the data being collected for the study.
 
 ---
 
@@ -177,8 +178,10 @@ BlinkBuddy is a working prototype that demonstrates the core idea of blink-based
 - **Packaged build is macOS Apple Silicon only.** The `.dmg` is built for arm64. A universal or cross-platform build was feasible but deprioritised in favour of other features given project time constraints.
 - **Only tested on macOS Apple Silicon.** The codebase is built on cross-platform technologies (Electron, Node, Python, MediaPipe, OpenCV), so running from source on Windows, Linux, or Intel Mac may work, but none of these configurations have been tested. Source install on other platforms should be considered experimental.
 - **Unsigned binary.** The packaged app requires a one-time Gatekeeper bypass on macOS (see installation instructions). Code signing requires a paid Apple Developer Programme membership.
-- **[BUG] Popup reminders steal focus on first activation.** The corner popup, screen edge glow, and 20-20-20 break popup all pull the user out of any fullscreen application the first time they fire in a session. Subsequent activations within the same session behave correctly, appearing over fullscreen apps without stealing focus. The cause is likely Electron's default auto-show behaviour on first content load. An attempted fix introduced new issues and was reverted to preserve stability for the project build submission. The reminders remain functional, this is a UX disruption.
+- **[BUG] First-reminder window behaviour can be inconsistent.** The corner popup, screen edge glow, and 20-20-20 break popup all sometimes snap the user in or out of a fullscreen workspace, or minimise the BlinkBuddy main window the first time they fire in a session. Subsequent reminders within the same session usually behave correctly without intervention. The cause appears to be related to how macOS resolves window-level state when Electron creates an always-on-top utility window for the first time.
+- **[BUG] Test-button window behaviour can be inconsistent.** Clicking the corner-popup or screen-edge-glow test button in Settings sometimes snaps the user in or out of a fullscreen workspace, or briefly minimises the BlinkBuddy main window. The behaviour is not fully reproducible and does not occur on every click. The reminders themselves still render correctly; the disruption is only to surrounding window state.
 - **[BUG] Screen edge glow offset on macOS.** The screen edge glow reminder is intended to cover all four edges of the screen. On macOS, the glow does not account for the dock's position: when the dock is visible on the bottom (or side), the glow on that edge is pushed inward by the dock's width or height, leaving a visible gap between the glow and the actual screen edge. This persists even when windows are in full-screen mode. The reminder is still visible and functional but the visuals are incomplete on the docked edge.
+- **[NOTE]** Attempted fixes for the three window-behaviour bugs above introduced new issues and were reverted to preserve stability before submission. The reminders remain functional; this is a UX disruption rather than a loss of feature.
 
 ### Clinical and evaluation
 
@@ -195,9 +198,9 @@ BlinkBuddy is a modular monolith: a single desktop application with clearly sepa
 - **Preload script** (`src/main/preload.ts`) exposes a typed `blinkBuddy` API to the renderer via Electron's `contextBridge`, with `nodeIntegration: false` and `contextIsolation: true`. The renderer has no direct access to Node or Electron APIs; all main-process capabilities go through this bridge.
 - **Renderer process** (React + TypeScript + Tailwind CSS, `src/renderer/`) handles all UI rendering, user input, and visual state. It communicates with the main process only via the preload bridge.
 - **Domain layer** (`src/domain/`) contains framework-agnostic business logic: the blink window rule, reminder state transitions, the 20-20-20 break timer, and session statistics. No files here import Electron, React, or Node APIs.
-- **Reminder strategies and dispatcher** (`src/main/reminder-strategies/`) use a plugin-style design. Each reminder strategy (overlay, screen edge glow, corner popup, audio cue) is an independent module that registers with a shared `ReminderDispatcher`. When the blink window elapses without a blink, the dispatcher fires a start event to every registered strategy; when the user blinks, it fires a stop event. Strategies can be toggled independently by the user, and the same dispatcher pattern is reused for 20-20-20 break reminders.
+- **Reminder strategies and dispatcher** (`src/main/reminder-strategies/`) use a plugin-style design. Each reminder strategy (screen edge glow, corner popup, audio cue) is an independent module that registers with a shared `ReminderDispatcher`. When the blink window elapses without a blink, the dispatcher fires a start event to every registered strategy; when the user blinks, it fires a stop event. Strategies can be toggled independently by the user, and the same dispatcher pattern is reused for 20-20-20 break reminders.
 - **Python inference service** (`python/`) runs as a subprocess. It captures webcam frames via OpenCV, runs facial landmark detection via MediaPipe's Face Landmarker Tasks API, computes blink events via Eye Aspect Ratio, and emits events to the main process over a JSON Lines protocol on stdin/stdout.
-- **Shared types** (`src/shared/`) define the IPC protocol (`ipc-messages.ts` for renderer<->main, `protocol.ts` for main<->Python) so message formats stay consistent across all layers.
+- **Shared types** (`src/shared/`) define cross-process contracts: `ipc-messages.ts` for renderer<->main IPC, `protocol.ts` for main<->Python IPC, and `reminder-strategies.ts` which acts as the central registry of strategy IDs used across the codebase, exporting both the typed union (`ReminderStrategyId`) and a runtime type guard (`isReminderStrategyId`) for validating IDs received over IPC.
 
 ---
 
@@ -243,13 +246,15 @@ blinkbuddy/
     ├── domain/
     ├── main/
     ├── python/
-    └── renderer/
+    ├── renderer/
+    └── shared/
+
 ```
 ---
 
 ## Acknowledgements
 
 - Blink detection built on [MediaPipe Face Landmarker](https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker) and [OpenCV](https://opencv.org/).
-- Eye Aspect Ratio approach informed by the blink detection Literature Review.
+- Eye Aspect Ratio approach informed by the Literature Review.
 - Desktop shell built on [Electron](https://electronjs.org/) with [Vite](https://vitejs.dev/) for the renderer build and [electron-builder](https://www.electron.build/) for packaging.
 - UI styled with [Tailwind CSS](https://tailwindcss.com/).

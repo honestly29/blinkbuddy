@@ -3,19 +3,11 @@
 import os
 import sys
 
-import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from python.config import load_config
 from python.blink_engine import BlinkEngine
 
-
-# Fixture that reloads the default config before every test so tests are isolated (runs automatically beofre every test)
-@pytest.fixture(autouse=True)
-def _load_defaults(tmp_path):
-    """Ensure default config is loaded before each test."""
-    load_config(str(tmp_path / "nonexistent.json"))
 
 def _make_detection(face_detected, ear=None):
     """Helper to build the minimal detection dict expected by BlinkEngine.update()"""
@@ -58,7 +50,7 @@ class TestBlinkDetection:
         # Two frames below threshold (CONSEC_FRAMES default = 2)
         engine.update(_make_detection(True, ear=0.15))
         engine.update(_make_detection(True, ear=0.15))
-        # Frame back above threshold — blink should fire
+        # Frame back above threshold - blink should fire
         events = engine.update(_make_detection(True, ear=0.30))
         blink_events = [e for e in events if e["type"] == "blink_event"]
         assert len(blink_events) == 1
@@ -93,7 +85,7 @@ class TestCooldownSuppression:
         engine = BlinkEngine()
         # _now_ms is called once per update() when face is detected.
         # First blink at 200ms (above initial 0 + 150ms cooldown).
-        # Second blink at 210ms (within 200 + 150ms cooldown — suppressed).
+        # Second blink at 210ms (within 200 + 150ms cooldown - suppressed).
         timestamps = iter([200.0, 201.0, 202.0, 210.0, 211.0, 212.0])
         engine._now_ms = lambda: next(timestamps)
 
@@ -104,7 +96,7 @@ class TestCooldownSuppression:
         blink_events = [e for e in events if e["type"] == "blink_event"]
         assert len(blink_events) == 1
 
-        # Second blink within cooldown — suppressed
+        # Second blink within cooldown - suppressed
         engine.update(_make_detection(True, ear=0.15))
         engine.update(_make_detection(True, ear=0.15))
         events = engine.update(_make_detection(True, ear=0.30))
@@ -148,7 +140,7 @@ class TestSingleFrameDip:
     # Tests alternating above/below frames to confirm no blink without consecutive frames
     def test_intermittent_dips_no_blink(self):
         engine = BlinkEngine()
-        # Alternating above/below — never hitting CONSEC_FRAMES consecutive
+        # Alternating above/below - never hitting CONSEC_FRAMES consecutive
         for _ in range(5):
             engine.update(_make_detection(True, ear=0.15))  # 1 frame below
             events = engine.update(_make_detection(True, ear=0.30))  # back above
@@ -174,7 +166,7 @@ class TestNoFaceTracking:
         engine.update(_make_detection(True, ear=0.15))
         # Face lost - resets counter
         engine.update(_make_detection(False))
-        # One more frame below then above — shouldn't count as blink
+        # One more frame below then above - shouldn't count as blink
         engine.update(_make_detection(True, ear=0.15))
         events = engine.update(_make_detection(True, ear=0.30))
         blink_events = [e for e in events if e["type"] == "blink_event"]
@@ -189,7 +181,7 @@ class TestReset:
         engine = BlinkEngine()
         engine.update(_make_detection(True, ear=0.15))
         engine.reset()
-        # One frame below then above — not enough for a blink
+        # One frame below then above - not enough for a blink
         engine.update(_make_detection(True, ear=0.15))
         events = engine.update(_make_detection(True, ear=0.30))
         blink_events = [e for e in events if e["type"] == "blink_event"]

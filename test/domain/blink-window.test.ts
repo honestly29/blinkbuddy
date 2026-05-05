@@ -49,14 +49,14 @@ describe('BlinkWindow', () => {
     expect(window.isOverdue(35_000)).toBe(true)
   })
 
-  it('setWindowSeconds clamps below minimum (5)', () => {
-    window.setWindowSeconds(2)
-    expect(window.getWindowSeconds()).toBe(5)
+  it('setWindowSeconds clamps below minimum (3)', () => {
+    window.setWindowSeconds(1)
+    expect(window.getWindowSeconds()).toBe(3)
   })
 
-  it('setWindowSeconds clamps above maximum (300)', () => {
-    window.setWindowSeconds(500)
-    expect(window.getWindowSeconds()).toBe(300)
+  it('setWindowSeconds clamps above maximum (60)', () => {
+    window.setWindowSeconds(100)
+    expect(window.getWindowSeconds()).toBe(60)
   })
 
   it('setWindowSeconds accepts values within range', () => {
@@ -88,11 +88,6 @@ describe('BlinkWindow', () => {
 
     // Overdue 20s after the last blink
     expect(window.isOverdue(50_000)).toBe(true)
-  })
-
-  it('uses default window of 20 seconds', () => {
-    const defaultWindow = new BlinkWindow()
-    expect(defaultWindow.getWindowSeconds()).toBe(20)
   })
 
   it('isStarted is false on a freshly constructed window', () => {

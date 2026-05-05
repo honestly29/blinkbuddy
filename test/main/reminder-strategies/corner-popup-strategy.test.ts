@@ -40,9 +40,7 @@ function createMockWindow() {
 
 const MockBrowserWindow = vi.mocked(BrowserWindow)
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
+
 
 describe('CornerPopupStrategy', () => {
   let strategy: CornerPopupStrategy

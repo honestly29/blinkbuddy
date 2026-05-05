@@ -41,7 +41,7 @@ afterEach(() => {
   delete window.blinkBuddy
 })
 
-describe('useSettings — setTwentyTwentyEnabled', () => {
+describe('useSettings - setTwentyTwentyEnabled', () => {
   it('always persists via saveSettings when toggled', async () => {
     const { result } = renderHook(() => useSettings())
     // Wait for the initial load

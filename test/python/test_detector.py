@@ -1,7 +1,7 @@
-"""Unit tests for python/detector.py — EAR formula and FaceDetector class.
+"""Unit tests for python/detector.py - EAR formula and FaceDetector class.
 
 Covers:
-  - compute_ear() — pure function, formula and edge cases
+  - compute_ear() - pure function, formula and edge cases
   - landmark index constants (RIGHT_EYE_INDICES, LEFT_EYE_INDICES)
   - FaceDetector class with mocked MediaPipe
 """
@@ -16,7 +16,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from python.config import load_config
+from python.config import DEFAULTS
 from python.detector import (
     FaceDetector,
     LEFT_EYE_INDICES,
@@ -77,14 +77,9 @@ def build_478_landmarks(right_eye_params=None, left_eye_params=None):
     return landmarks
 
 
-@pytest.fixture(autouse=True)
-def _load_defaults(tmp_path):
-    """Reset config to defaults before each test."""
-    load_config(str(tmp_path / "nonexistent.json"))
-
 
 # ---------------------------------------------------------------------------
-# Part A — compute_ear()
+# Part A - compute_ear()
 #
 # These tests call compute_ear() directly with synthetic landmarks.
 # ---------------------------------------------------------------------------
@@ -214,7 +209,7 @@ class TestComputeEarDuckTyping:
 
 
 # ---------------------------------------------------------------------------
-# Part B — Landmark index constants
+# Part B - Landmark index constants
 #
 # These tests validate the hard-coded index tuples that select which
 # of MediaPipe's 478 facial landmarks are used for each eye. A wrong
@@ -259,7 +254,7 @@ class TestLandmarkConstants:
 
 
 # ---------------------------------------------------------------------------
-# Part C — FaceDetector (requires MediaPipe mocking)
+# Part C - FaceDetector (requires MediaPipe mocking)
 #
 # FaceDetector wraps MediaPipe's FaceLandmarker. To test it without
 # a real camera or model file, we mock all MediaPipe imports.
@@ -400,12 +395,10 @@ class TestFaceDetectorQualityGate:
     """
 
     def test_c6_face_passes_when_threshold_below_hardcoded_quality(
-        self, mock_mediapipe, tmp_path
+        self, mock_mediapipe, monkeypatch
     ):
         """With threshold=0.99 and hardcoded quality=1.0, faces pass (1.0 >= 0.99)."""
-        config_path = tmp_path / "config.json"
-        config_path.write_text('{"TRACKING_QUALITY_THRESHOLD": 0.99}')
-        load_config(str(config_path))
+        monkeypatch.setitem(DEFAULTS, "TRACKING_QUALITY_THRESHOLD", 0.99)
 
         landmarks = build_478_landmarks(
             right_eye_params=(0.3, 0.3, 1.0),
@@ -423,15 +416,13 @@ class TestFaceDetectorQualityGate:
         assert out["face_detected"] is True
 
     def test_c6_face_rejected_when_threshold_above_hardcoded_quality(
-        self, mock_mediapipe, tmp_path
+        self, mock_mediapipe, monkeypatch
     ):
         """With threshold=1.5 and hardcoded quality=1.0, faces are rejected.
 
         Currently, this threshold will never occur in practice, but it tests that the threshold comparison logic works correctly.
         """
-        config_path = tmp_path / "config.json"
-        config_path.write_text('{"TRACKING_QUALITY_THRESHOLD": 1.5}')
-        load_config(str(config_path))
+        monkeypatch.setitem(DEFAULTS, "TRACKING_QUALITY_THRESHOLD", 1.5)
 
         landmarks = build_478_landmarks(
             right_eye_params=(0.3, 0.3, 1.0),

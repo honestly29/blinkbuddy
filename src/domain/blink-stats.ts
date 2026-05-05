@@ -1,17 +1,23 @@
 /**
- * Rolling window blink counter with per-minute rate calculation
- * and inter-blink interval tracking.
+ * Tracks blinks during a session and exposes per-minute rate plus
+ * inter-blink intervals.
  *
- * All timestamps in milliseconds.
+ * Two arrays are kept: `recentBlinks` for the rolling 60-second window
+ * (used by the live blink-rate display), and `allBlinks` for the whole
+ * session (used to compute inter-blink intervals at session end).
+ *
+ * All timestamps are Unix timestamps in milliseconds.
  */
 
-const ROLLING_WINDOW_MS = 60_000 // 60 seconds
+const ROLLING_WINDOW_MS = 60_000 
 
 export class BlinkStatsTracker {
-  /** All blink timestamps for the session (for inter-blink intervals). */
+  /** Every blink in the session, kept so we can compute inter-blink
+   *  intervals at the end. */
   private allBlinks: number[] = []
 
-  /** Rolling window of recent blink timestamps (last 60s). */
+  /** Blinks in the last 60 seconds, kept separately so the live blink
+   *  rate doesn't have to scan the whole session every tick. */
   private recentBlinks: number[] = []
 
   /** Session total blink count. */
@@ -25,17 +31,13 @@ export class BlinkStatsTracker {
   }
 
   /**
-   * Returns the rolling blink rate (blinks per minute).
-   * Only counts blinks within the last 60 seconds.
+   * Returns the count of blinks in the last 60 seconds.
    */
   getBlinksPerMinute(now: number): number {
     this.pruneOldBlinks(now)
-
     if (this.recentBlinks.length === 0) {
       return 0
     }
-
-    // Count blinks in the rolling window
     return this.recentBlinks.length
   }
 
@@ -63,10 +65,14 @@ export class BlinkStatsTracker {
     this.totalCount = 0
   }
 
-  /** Remove blinks older than 60 seconds from the rolling window. */
+  /**
+   * Drop blinks older than 60 seconds from the rolling window. Iterates
+   * over the array from the front and slices off the old entries.
+   */
   private pruneOldBlinks(now: number): void {
     const cutoff = now - ROLLING_WINDOW_MS
-    // recentBlinks is always in chronological order, so find the first index that is >= cutoff and slice.
+    // recentBlinks is in oldest-first order, so once we find the
+    // first blink within the window, everything before it is sliced off.
     let firstValid = 0
     while (firstValid < this.recentBlinks.length && this.recentBlinks[firstValid] < cutoff) {
       firstValid++

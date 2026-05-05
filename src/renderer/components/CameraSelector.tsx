@@ -39,7 +39,7 @@ export function CameraSelector({
           <option value={0}>Loading cameras...</option>
         )}
 
-        {/* State 2: Empty - no cameras found (Python not running or no webcam) */}
+        {/* State 2: Empty - cameras list came back empty (no webcam detected or enumeration found nothing). */}
         {cameras.length === 0 && !loading && (
           <option value={0}>Default camera</option>
         )}

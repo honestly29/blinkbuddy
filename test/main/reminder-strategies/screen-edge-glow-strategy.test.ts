@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ---------------------------------------------------------------------------
-// Mock Electron — factory must not reference top-level variables
+// Mock Electron 
 // ---------------------------------------------------------------------------
 // Tests run in Node.js, not Electron, so `import { BrowserWindow } from 'electron' would crash. 
 // vi.mock replaces the electron module with fakes before any imports run.

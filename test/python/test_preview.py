@@ -53,7 +53,8 @@ class TestDrawLandmarks:
         original = frame.copy()
         landmarks = _make_landmarks()
         draw_landmarks(frame, landmarks)
-        # The drawn polylines should change at least some pixels on the blank frame
+        # The drawn polylines should change some pixels 
+        # on the blank frame
         assert not np.array_equal(frame, original)
 
     def test_returns_same_frame_object(self):
@@ -142,7 +143,7 @@ class TestRenderPreview:
         original = frame.copy()
         landmarks = _make_landmarks()
         render_preview(frame, landmarks)
-        # The original frame should be completely unchange
+        # The original frame should be completely unchanged
         assert np.array_equal(frame, original)
 
     def test_returns_expected_keys(self):
@@ -153,7 +154,7 @@ class TestRenderPreview:
         assert set(result.keys()) == {"data", "width", "height"}
 
     def test_end_to_end_valid_jpeg(self):
-        """The full pipeline should produce a valid JPEG (integration test)."""
+        """The full pipeline should produce a valid JPEG."""
         frame = _make_frame(640, 480)
         landmarks = _make_landmarks()
         result = render_preview(frame, landmarks)

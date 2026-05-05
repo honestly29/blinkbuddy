@@ -313,9 +313,6 @@ export class SessionManager {
     this.reminderState = result.state
     const isBreakActive = this.twentyTwenty.getPhase() === 'break_active' 
     this.reminderDispatcher.update(!isBreakActive && result.shouldShowReminder) 
-    if (result.shouldResetTimer) {
-      this.blinkWindow.reset(timestamp)
-    }
 
     this.pushStateUpdate()
   }
@@ -480,7 +477,6 @@ export class SessionManager {
       totalBlinks: this.blinkStats.getTotalBlinks(),
       sessionDurationMs: this.sessionStartTime >= 0 ? now - this.sessionStartTime : 0,
       faceDetected: this.faceDetected,
-      twentyTwentyState: this.lastTwentyTwentyState,
       remindersTriggered: this.remindersTriggered,
     }
 

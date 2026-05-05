@@ -18,6 +18,10 @@ const APP_NAME = 'blinkbuddy'
 
 // ---------- args ----------
 
+/**
+ * Parse --key=value command-line flags into an args object.
+ * Anything that doesn't match the pattern is silently ignored.
+ */
 function parseArgs(argv) {
   const args = {}
   for (const raw of argv.slice(2)) {
@@ -84,7 +88,7 @@ function randBetween(min, max) {
 }
 
 function randInt(min, max) {
-  // max + 1 because Math.floor drops the fractional part 
+  // max + 1 makes the upper bound inclusive
   return Math.floor(randBetween(min, max + 1))
 }
 
@@ -99,7 +103,7 @@ function round2(n) {
 // ---------- session generator ----------
 
 const NOW = Date.now()
-const WINDOW_DAYS = 21   // 21 days
+const WINDOW_DAYS = 21   
 const WINDOW_MS = WINDOW_DAYS * 24 * 60 * 60 * 1000
 
 /**
@@ -120,7 +124,11 @@ function pickSessionStartMs() {
 }
 
 /**
- * Generate a single SessionSummary with correlated realistic fields.
+ * Generate a single SessionSummary with internally-consistent fields.
+ *
+ * Fields are derived from each other rather than randomised independently,
+ * so e.g. totalBlinks comes from targetBpm * duration. This avoids
+ * obviously-fake combinations like 5000 blinks in a 2-minute session.
  */
 function generateSession() {
   // Duration 2min to 30min 
@@ -129,14 +137,15 @@ function generateSession() {
   const targetBpm = randBetween(8, 25)
   // Derive totalBlinks from the target rate so the two fields agree.
   const totalBlinks = Math.round(targetBpm * (durationSeconds / 60))
-  // Recompute avgBlinksPerMinute 
+  // Recompute avgBlinksPerMinute from the rounded totalBlinks, so the
+  // stored value matches the count.
   const avgBlinksPerMinute = round2(totalBlinks / (durationSeconds / 60))
 
   // ~40% of sessions produce reminders 
   const remindersTriggered = rand() < 0.4 ? randInt(1, 5) : 0
 
   // ~70% had the 20-20-20 timer enabled. 
-  const possibleBreaks = Math.floor(durationSeconds / 1200)   // how many 20-minute cycles fit in the session duration.
+  const possibleBreaks = Math.floor(durationSeconds / 1200)  // 1200 = 20 minutes
   const twentyTwentyBreaksTaken = rand() < 0.7 ? possibleBreaks : 0
 
   // Longest gap rises as blink rate falls 
@@ -179,4 +188,4 @@ fs.writeFileSync(targetFile, JSON.stringify(sessions, null, 2), 'utf-8')
 
 console.log(`Wrote ${sessions.length} fake sessions to ${targetFile}`)
 console.log(`  seed=${seed} window=last ${WINDOW_DAYS} days`)
-console.log(`  range: ${sessions[0].sessionStart} → ${sessions[sessions.length - 1].sessionStart}`)
+console.log(`  range: ${sessions[0].sessionStart} -> ${sessions[sessions.length - 1].sessionStart}`)

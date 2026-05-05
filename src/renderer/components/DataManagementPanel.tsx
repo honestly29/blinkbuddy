@@ -1,8 +1,19 @@
 import { useEffect, useState } from 'react'
 
-// Dev flag. 
-// Set false to disable 'wipe sessions' feature 
-// This is for any build going to participants in a study so they can't accidentally destroy their own data. 
+/**
+ * Settings panel for managing logged session data.
+ *
+ * Provides two operations: exporting all sessions to a CSV file, and
+ * clearing all sessions (gated behind the ENABLE_CLEAR_DATA flag).
+ *
+ * Both operations go through Electron's IPC layer to the main process,
+ * which handles the actual file I/O. The panel tracks operation state
+ * locally so the UI can show progress and disable buttons while an
+ * operation is in flight.
+ */
+ 
+// DEV FLAG: Set false to disable 'wipe sessions' feature for any build going
+// to participants in a study so they can't accidentally destroy their data. 
 const ENABLE_CLEAR_DATA = true
 
 type Status =
@@ -19,6 +30,8 @@ export function DataManagementPanel() {
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
 
   useEffect(() => {
+    // Fetch the session count once on mount. `cancelled` ignores the
+    // result if the component unmounts before the fetch resolves.
     let cancelled = false
     window.blinkBuddy
       .getSessionHistory()
@@ -33,7 +46,9 @@ export function DataManagementPanel() {
     }
   }, [])
 
-  // Derived UI state. Recomputed each render rather than stored in useState 
+  // Derived from `status` each render rather than tracked as separate
+  // state. Keeping these in useState would risk them drifting out of
+  // sync with `status` if either was updated independently.
   const exporting = status.kind === 'exporting'
   const clearing = status.kind === 'clearing'
   const hasSessions = sessionCount !== null && sessionCount > 0
@@ -42,6 +57,8 @@ export function DataManagementPanel() {
   const clearDisabled = !hasSessions || exporting || clearing
 
   async function handleExport() {
+    // Triggers the main-process CSV export. Four possible result statuses:
+    // saved, cancelled (user closed the dialog), no-sessions, or error.
     setStatus({ kind: 'exporting' })
     try {
       const result = await window.blinkBuddy.exportSessionsCsv()
@@ -68,6 +85,9 @@ export function DataManagementPanel() {
   }
 
   async function handleClear() {
+    // Triggers the main-process session-data wipe. Confirmation dialog is
+    // handled by the main-process IPC handler, not here. Three statuses:
+    // cleared, cancelled, or error.
     setStatus({ kind: 'clearing' })
     try {
       const result = await window.blinkBuddy.clearSessions()

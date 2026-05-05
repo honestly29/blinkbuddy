@@ -1,3 +1,7 @@
+/**
+ * Renderer entry point. Mounts the React app into #root in index.html.
+ * StrictMode wraps the tree to enable React's development-time checks.
+ */
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'

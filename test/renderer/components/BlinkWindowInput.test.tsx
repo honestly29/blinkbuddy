@@ -28,20 +28,20 @@ describe('BlinkWindowInput', () => {
   // -- Clamp-on-blur tests: verify range enforcement when the input loses focus --
   it('clamps value to minimum on blur', () => {
     const onChange = vi.fn()
-    // Value 2 is below the minimum of 5
-    render(<BlinkWindowInput value={2} disabled={false} onChange={onChange} />)
+    // Value 1 is below the minimum of 3
+    render(<BlinkWindowInput value={1} disabled={false} onChange={onChange} />)
     const input = screen.getByRole('spinbutton')
     fireEvent.blur(input)  // Simulate clicking away from the input
-    expect(onChange).toHaveBeenCalledWith(5)  // Should clamp up to minimum
+    expect(onChange).toHaveBeenCalledWith(3)  // Should clamp up to minimum
   })
 
   it('clamps value to maximum on blur', () => {
     const onChange = vi.fn()
-    // Value 500 is above the maximum of 300
-    render(<BlinkWindowInput value={500} disabled={false} onChange={onChange} />)
+    // Value 100 is above the maximum of 60
+    render(<BlinkWindowInput value={100} disabled={false} onChange={onChange} />)
     const input = screen.getByRole('spinbutton')
     fireEvent.blur(input)
-    expect(onChange).toHaveBeenCalledWith(300)  // Should clamp down to maximum
+    expect(onChange).toHaveBeenCalledWith(60)  // Should clamp down to maximum
   })
 
   it('does not call onChange on blur if value is in range', () => {

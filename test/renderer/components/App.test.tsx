@@ -34,7 +34,6 @@ function makeStateUpdate(overrides: Partial<StateUpdate> = {}): StateUpdate {
     sessionDurationMs: 0,
     faceDetected: false,
     reminderState: 'idle',
-    twentyTwentyState: { phase: 'idle', timeUntilBreakMs: 0, breakTimeRemainingMs: 0 },
     remindersTriggered: 0,
     ...overrides,
   }

@@ -25,7 +25,6 @@ function writePrefs(prefs: unknown): void {
 }
 
 describe('ReminderPreferencesStore', () => {
-  // -- Defaults & round-trip --
 
   it('returns defaults when no file exists', () => {
     expect(store.load()).toEqual(DEFAULT_REMINDER_PREFERENCES)
@@ -56,7 +55,6 @@ describe('ReminderPreferencesStore', () => {
     expect(store.load()).toEqual(DEFAULT_REMINDER_PREFERENCES)
   })
 
-  // -- Sub-object level --
 
   it('fills missing sub-objects with defaults', () => {
     writePrefs({ cornerPopup: { enabled: false, corner: 'top-left' } })
@@ -160,8 +158,6 @@ describe('ReminderPreferencesStore', () => {
     expect(cue.volume).toBe(0.7)
   })
 
-  // -- Cross-sub-object preservation --
-
   it('preserves valid sub-objects alongside broken ones', () => {
     writePrefs({
       screenEdgeGlow: 'broken',
@@ -175,7 +171,6 @@ describe('ReminderPreferencesStore', () => {
     expect(loaded.audioCue).toEqual(DEFAULT_REMINDER_PREFERENCES.audioCue)
   })
 
-  // -- Existing user upgrade --
 
   it('returns all defaults for empty object', () => {
     writePrefs({})

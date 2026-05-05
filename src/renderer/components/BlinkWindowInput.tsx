@@ -6,7 +6,7 @@ interface BlinkWindowInputProps {
 
 /**
  * Numeric input for the blink window duration (T seconds).
- * Valid range: 5-300 seconds, matching the Implementation Plan specification.
+ * Valid range: 3-60 seconds.
  *
  * Uses a "clamp-on-blur" validation strategy: any number can be typed during editing,
  * but out-of-range values are corrected when the user clicks away from the input. 
@@ -21,9 +21,9 @@ export function BlinkWindowInput({ value, disabled, onChange }: BlinkWindowInput
     }
   }
 
-  // Called when the input loses focus. Clamps the value to [5, 300] and rounds to the nearest integer.
+  // Called when the input loses focus. Clamps the value to [3, 60] and rounds to the nearest integer.
   const handleBlur = () => {
-    const clamped = Math.max(5, Math.min(300, Math.round(value)))
+    const clamped = Math.max(3, Math.min(60, Math.round(value)))
     if (clamped !== value) {
       onChange(clamped)
     }
@@ -34,8 +34,8 @@ export function BlinkWindowInput({ value, disabled, onChange }: BlinkWindowInput
       <label className="text-sm text-gray-300">Blink window (seconds)</label>
       <input
         type="number"
-        min={5}
-        max={300}
+        min={3}
+        max={60}
         step={1}
         value={value}
         onChange={handleChange}

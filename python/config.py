@@ -1,54 +1,31 @@
-"""Detection parameters loaded from JSON with fallback defaults."""
-
-import json
-import os
-import sys
-
-from python.paths import resource_path
+"""Detection parameters for the blink-detection pipeline."""
 
 DEFAULTS = {
+    # EAR cutoff for "eye closed". Sits between open-eye EAR
+    # (~0.25-0.35) and closed-eye EAR (near zero).
+    # Soukupova and Cech (2016)
     "EAR_THRESHOLD": 0.21,
+
+    # Consecutive frames of low EAR required to count as a blink.
+    # Krolak and Strumillo (2012)
     "CONSEC_FRAMES": 2,
+
+    # Minimum gap between blink events. Blinks typically last ~100-400 ms
+    # Soukupova and Cech (2016)
     "COOLDOWN_MS": 150,
+
+    # MediaPipe confidence floor for treating tracking as reliable.
+    # Currently dead code (see detector.py); kept as a forward-
+    # compatibility hook
     "TRACKING_QUALITY_THRESHOLD": 0.5,
+
+    # MediaPipe Face Landmarker v2 model, relative to python/.
+    # Downloaded during setup and resolved at runtime via
+    # paths.resource_path().
     "MODEL_PATH": "models/face_landmarker_v2.task",
 }
 
-_config = None
-
-
-def load_config(path=None):
-    """Load detection config from a JSON file, falling back to defaults.
-
-    Args:
-        path: Path to a JSON config file. If None, looks for
-              detection_config.json in the same directory as this module.
-
-    Returns:
-        A dict of detection parameters.
-    """
-    global _config
-
-    config = dict(DEFAULTS)
-
-    if path is None:
-        path = resource_path("detection_config.json")
-
-    if os.path.isfile(path):
-        try:
-            with open(path, "r") as f:
-                user_config = json.load(f)
-            config.update(user_config)
-        except (json.JSONDecodeError, OSError) as e:
-            print(f"Warning: could not load config from {path}: {e}", file=sys.stderr)
-
-    _config = config
-    return config
-
 
 def get_config():
-    """Return the loaded config, loading defaults if not yet initialised."""
-    global _config
-    if _config is None:
-        return load_config()
-    return _config
+    """Return a fresh copy of the detection parameters."""
+    return dict(DEFAULTS)

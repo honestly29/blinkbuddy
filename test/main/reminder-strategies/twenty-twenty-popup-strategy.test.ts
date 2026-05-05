@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ---------------------------------------------------------------------------
-// Mock Electron — factory must not reference top-level variables
+// Mock Electron - factory must not reference top-level variables
 // ---------------------------------------------------------------------------
 
 vi.mock('electron', () => {

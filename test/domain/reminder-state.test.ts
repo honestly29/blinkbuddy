@@ -10,11 +10,9 @@ describe('Reminder state machine', () => {
     blinkWindow = new BlinkWindow(10) // 10-second window for easier testing
   })
 
-  // -----------------------------------------------------------------------
-  // IDLE → OVERDUE → IDLE (full cycle)
-  // -----------------------------------------------------------------------
 
-  describe('IDLE → OVERDUE → IDLE', () => {
+
+  describe('IDLE -> OVERDUE -> IDLE', () => {
     it('transitions to OVERDUE when timer tick fires and blink is overdue', () => {
       blinkWindow.reset(0)
       const tick: DomainEvent = { type: 'timer_tick', timestamp: 10_000 }
@@ -35,11 +33,8 @@ describe('Reminder state machine', () => {
     })
   })
 
-  // -----------------------------------------------------------------------
-  // IDLE → SUPPRESSED → IDLE (with timer reset)
-  // -----------------------------------------------------------------------
 
-  describe('IDLE → SUPPRESSED → IDLE', () => {
+  describe('IDLE -> SUPPRESSED -> IDLE', () => {
     it('transitions to SUPPRESSED when face is lost', () => {
       const trackingLost: DomainEvent = {
         type: 'tracking_update',
@@ -66,11 +61,8 @@ describe('Reminder state machine', () => {
     })
   })
 
-  // -----------------------------------------------------------------------
-  // OVERDUE → SUPPRESSED → IDLE
-  // -----------------------------------------------------------------------
 
-  describe('OVERDUE → SUPPRESSED → IDLE', () => {
+  describe('OVERDUE -> SUPPRESSED -> IDLE', () => {
     it('transitions from OVERDUE to SUPPRESSED when face is lost', () => {
       const trackingLost: DomainEvent = {
         type: 'tracking_update',
@@ -96,9 +88,6 @@ describe('Reminder state machine', () => {
     })
   })
 
-  // -----------------------------------------------------------------------
-  // No-op transitions
-  // -----------------------------------------------------------------------
 
   describe('no-op transitions', () => {
     it('IDLE stays IDLE when timer tick and NOT overdue', () => {
@@ -166,9 +155,6 @@ describe('Reminder state machine', () => {
     })
   })
 
-  // -----------------------------------------------------------------------
-  // Key invariants
-  // -----------------------------------------------------------------------
 
   describe('key invariants', () => {
     it('shouldShowReminder is true ONLY in OVERDUE state', () => {

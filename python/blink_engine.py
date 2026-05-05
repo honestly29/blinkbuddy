@@ -8,10 +8,17 @@ from python.config import get_config
 class BlinkEngine:
     """Tracks EAR values per frame and emits blink events.
 
-    Uses the `type` field discriminator pattern so that a future
-    `partial_blink_event` can be added without breaking existing handlers.
+    The detection model treats a blink as several consecutive low-EAR
+    frames followed by EAR rising back above threshold, not a single
+    frame dropping below. This filters out brief eyelid twitches and
+    noise. A cooldown after each emitted blink stops one slow blink
+    from being counted twice if EAR briefly rises mid-blink.
 
-    All thresholds are read from config.py - nothing is hardcoded.
+    Each event carries a `type` field so handlers can tell tracking_status
+    events from blink_event events, and so a future event type can be
+    added without breaking existing handlers.
+
+    All thresholds come from config.py.
     """
 
     def __init__(self):
@@ -20,9 +27,9 @@ class BlinkEngine:
         self._consec_frames = config["CONSEC_FRAMES"]
         self._cooldown_ms = config["COOLDOWN_MS"]
 
-        # Tracks how many consecutive frames the EAR has been below the threshold. Starts at 0. Incremented when EAR is below threshold. Reset to 0 when EAR rises above threshold or face is lost.
+        # How many recent consecutive frames had EAR below the threshold.
         self._below_count = 0
-        # Timestamp of last emitted blink event.
+        # Timestamp of the last emitted blink, used to enforce the cooldown.
         self._last_blink_time_ms = 0.0
 
     def _now_ms(self):
@@ -37,12 +44,13 @@ class BlinkEngine:
                 face_detected (bool) and ear (float | None).
 
         Returns:
-            A list of event dicts to emit (may be empty). Each event has a
-            `type` field as discriminator.
+            A list of event dicts to emit (may be empty). Each event has
+            a `type` field naming what kind of event it is.
         """
         events = []
         
-        # If no face is detected, _below_count is reset to 0 and tracking_status event with face_dected: False is emmited
+        # No face: reset the consec-frames counter so a partial run before
+        # the tracking gap doesn't combine with frames after it into a false blink.
         if not detection_result["face_detected"]:
             self._below_count = 0
             events.append({
@@ -50,7 +58,7 @@ class BlinkEngine:
                 "face_detected": False,
                 "timestamp": self._now_ms(),
             })
-            return events # no further processing happens - no EAR to evaluate
+            return events 
 
         ear = detection_result["ear"]
         now_ms = self._now_ms()
@@ -62,11 +70,11 @@ class BlinkEngine:
             "timestamp": now_ms,
         })
 
-        # If eye is closed (or closing) increment consec-frames counter
+        # EAR below threshold: increment low consec-frames counter
         if ear < self._ear_threshold:
             self._below_count += 1
         elif self._below_count >= self._consec_frames:
-            # When EAR rises back above the threshold after enough consecutive frames below - a blink event is emmited.
+            # EAR rose back above the threshold after enough consecutive frames below - This is a blink.
             if (now_ms - self._last_blink_time_ms) >= self._cooldown_ms:
                 events.append({
                     "type": "blink_event",
@@ -74,14 +82,17 @@ class BlinkEngine:
                     "ear": ear,
                 })
                 self._last_blink_time_ms = now_ms
-            self._below_count = 0  # EAR above threshold but not enough consecutive frames is considered as noise
+            self._below_count = 0 
         else:
-            # EAR above threshold but below_count < consec_frames - not a blink.
+            # EAR above threshold but the low consec-frames run was too 
+            # short to count. Treat as noise and reset.
             self._below_count = 0
 
         return events
 
     def reset(self):
-        """Reset internal state (e.g. when stopping a session)."""
+        """Clear consec-frames counter and last-blink timestamp.
+        Called when stopping a session so the next session starts fresh.
+        """
         self._below_count = 0
         self._last_blink_time_ms = 0.0

@@ -25,9 +25,9 @@ export function PreviewCanvas({ visible }: PreviewCanvasProps) {
       }
     })
 
-    // Return the unsubscribe function as useEffect cleanup.
     return unsubscribe
-  }, [visible]) 
+    // Re-run when visibility toggles: subscribe on show, unsubscribe on hide.
+  }, [visible])   
 
   if (!visible || !frame) {
     return null
@@ -37,8 +37,12 @@ export function PreviewCanvas({ visible }: PreviewCanvasProps) {
     <div className="rounded-lg bg-gray-800 p-4">
       <h2 className="mb-2 text-lg font-semibold text-white">Camera Preview</h2>
       {/* Data URI embeds the JPEG directly in the src attribute.
-          The browser decodes the base64 string and renders the image
-          natively, with no HTTP request or file path needed. */}
+        The browser decodes the base64 string and renders the image
+        natively, with no HTTP request or file path needed.
+
+        -scale-x-100 mirrors the image horizontally so the preview
+        behaves like a mirror (i.e head moves left on screen when the user
+        moves left). */}
       <img
         src={`data:image/jpeg;base64,${frame.data}`}
         width={frame.width}

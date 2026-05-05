@@ -180,11 +180,11 @@ class TestRoundTrip:
         assert result["ear_value"] == 0.18
 
     def test_tracking_status(self):
-        msg = make_tracking_status(True, 0.92, 28.6, 1709380800000)
+        msg = make_tracking_status(True, 0.92, 1709380800000)
         assert deserialise(serialise(msg)) == msg
 
     def test_tracking_status_no_face(self):
-        msg = make_tracking_status(False, 0.0, 15.0, 1709380800000)
+        msg = make_tracking_status(False, 0.0, 1709380800000)
         result = deserialise(serialise(msg))
         assert result["face_detected"] is False
 
@@ -233,11 +233,10 @@ class TestMessageFactories:
         assert msg["duration_ms"] == 120
 
     def test_tracking_status_fields(self):
-        msg = make_tracking_status(True, 0.95, 30.0, 2000)
+        msg = make_tracking_status(True, 0.95, 2000)
         assert msg["type"] == "tracking_status"
         assert msg["face_detected"] is True
         assert msg["quality"] == 0.95
-        assert msg["fps"] == 30.0
         assert msg["timestamp"] == 2000
 
     def test_preview_frame_fields(self):

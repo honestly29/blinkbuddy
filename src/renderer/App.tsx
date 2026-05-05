@@ -14,6 +14,14 @@ import { TabBar } from './components/TabBar'
 import { TABS } from './navigation'
 import type { Tab } from './navigation'
 
+/**
+ * Top-level layout for BlinkBuddy.
+ *
+ * Wires the two main hooks (useBlinkMonitor for session state,
+ * useSettings for user preferences) into the four-tab UI: Monitor,
+ * Tips, Stats, Settings. The TabBar is rendered outside <main> so it
+ * stays fixed at the bottom while content scrolls.
+ */
 function App() {
   // -- Monitoring state  --
   const {
@@ -82,6 +90,8 @@ function App() {
       {/* -- Main content area -- */}
       <main className="flex flex-1 flex-col gap-6 overflow-y-auto p-6">
         
+        {/* One block per tab. Only the active tab's block renders. */}
+
         {activeTab === 'monitor' && (
           <>
             <BlinkStatsPanel
@@ -90,7 +100,10 @@ function App() {
               sessionDurationMs={sessionDurationMs}
             />
 
-            {/* Camera preview toggle lives on the Monitor page. */}
+            {/* Camera preview toggle lives on the Monitor page. Three states:
+              not running (nothing renders), running with preview enabled (full
+              preview + hide button), running with preview disabled (a show button).
+              */}
             {running && (
               settings.previewEnabled ? (
                 <div>
@@ -106,7 +119,7 @@ function App() {
                   <PreviewCanvas visible />
                 </div>
               ) : (
-                // Preview is off: show a single button to turn it on.
+
                 <button
                   onClick={() => handlePreviewChange(true)}
                   className="rounded-lg border border-gray-700 px-4 py-2 text-sm text-gray-400 transition-colors hover:border-gray-600 hover:text-gray-300"
@@ -150,7 +163,8 @@ function App() {
           </>
         )}
       </main>
-
+        {/* TabBar sits outside <main> so it stays fixed at the bottom while
+          main content scrolls. */}
       <TabBar tabs={TABS} activeTab={activeTab} onTabChange={setActiveTab} />
     </div>
   )

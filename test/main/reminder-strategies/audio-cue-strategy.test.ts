@@ -117,7 +117,7 @@ describe('AudioCueStrategy', () => {
   it('queues play if page not loaded yet, plays on did-finish-load', () => {
     strategy.onReminderStart()
 
-    // Not loaded yet — executeJavaScript should not be called
+    // Not loaded yet - executeJavaScript should not be called
     expect(mockWin.webContents.executeJavaScript).not.toHaveBeenCalled()
 
     // Simulate load

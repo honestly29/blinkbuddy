@@ -1,20 +1,30 @@
 /**
- * Three-state reminder machine: IDLE -> OVERDUE -> SUPPRESSED.
- *
- * Reminders are ONLY shown in the OVERDUE state.
- * SUPPRESSED hides reminders when face tracking is unavailable.
- * Returning from SUPPRESSED always resets the blink timer.
- *
+ * Reminder state machine with three states. 
+ * 
+ * IDLE is the healthy running state: monitoring is active, face tracking 
+ * is working, and the user has blinked recently enough that no reminder is 
+ * shown. 
+ * 
+ * OVERDUE means the blink window has expired and a reminder is visible 
+ * until the user blinks.
+ * 
+ * SUPPRESSED means face tracking has dropped, so reminders are paused
+ * until tracking comes back. 
+ * 
+ * SUPPRESSED can be entered from either IDLE or OVERDUE, and always 
+ * returns to IDLE, resetting the blink window since the user may have 
+ * stepped away during the gap.
  */
 
 import type { ReminderState, DomainEvent, ReminderTransitionResult } from './types'
 import type { BlinkWindow } from './blink-window'
 
 /**
- * Evaluate a state transition given the current state, a domain event,
- * and the blink window (for overdue checks).
- *
- * Returns the new state plus side-effect flags.
+ * Decide what should happen given the current state and an incoming event 
+ * (a blink, a timer tick, or a tracking-status change).
+ * Returns the new state plus two flags: whether the caller should show a
+ * reminder, and whether the caller should reset the blink window. This
+ * function only computes the result; acting on the flags is the caller's job.
  */
 export function transition(
   currentState: ReminderState,
@@ -35,6 +45,7 @@ function transitionFromIdle(
   event: DomainEvent,
   blinkWindow: BlinkWindow,
 ): ReminderTransitionResult {
+
   if (event.type === 'tracking_update' && !event.faceDetected) {
     return { state: 'suppressed', shouldShowReminder: false, shouldResetTimer: false }
   }
@@ -43,13 +54,12 @@ function transitionFromIdle(
     return { state: 'overdue', shouldShowReminder: true, shouldResetTimer: false }
   }
 
-  // blink_detected in IDLE is a no-op (already idle)
-  // timer_tick when not overdue is a no-op
-  // tracking_update with face detected is a no-op
+  // All other events stay in IDLE.
   return { state: 'idle', shouldShowReminder: false, shouldResetTimer: false }
 }
 
 function transitionFromOverdue(event: DomainEvent): ReminderTransitionResult {
+  
   if (event.type === 'blink_detected') {
     return { state: 'idle', shouldShowReminder: false, shouldResetTimer: true }
   }
@@ -58,17 +68,19 @@ function transitionFromOverdue(event: DomainEvent): ReminderTransitionResult {
     return { state: 'suppressed', shouldShowReminder: false, shouldResetTimer: false }
   }
 
-  // Stay overdue
+  // All other events stay in OVERDUE with the reminder visible. The reminder
+  // persists across timer ticks until the user actually blinks.
   return { state: 'overdue', shouldShowReminder: true, shouldResetTimer: false }
 }
 
 function transitionFromSuppressed(event: DomainEvent): ReminderTransitionResult {
+  // Reset the blink timer when tracking comes back.
+  // The user was likely away or moved, so resuming the old window would
+  // pretend no time had passed and could trigger a stale reminder.
   if (event.type === 'tracking_update' && event.faceDetected) {
     return { state: 'idle', shouldShowReminder: false, shouldResetTimer: true }
   }
 
-  // blink_detected in SUPPRESSED is a no-op
-  // timer_tick in SUPPRESSED is a no-op
-  // tracking_update with face still lost is a no-op
+  // All other events stay in SUPPRESSED.
   return { state: 'suppressed', shouldShowReminder: false, shouldResetTimer: false }
 }

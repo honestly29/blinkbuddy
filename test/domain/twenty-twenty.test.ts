@@ -11,9 +11,7 @@ describe('TwentyTwentyTimer', () => {
     timer = new TwentyTwentyTimer()
   })
 
-  // -----------------------------------------------------------------------
-  // Initial state
-  // -----------------------------------------------------------------------
+ 
 
   it('starts in idle phase', () => {
     expect(timer.getPhase()).toBe('idle')
@@ -26,9 +24,7 @@ describe('TwentyTwentyTimer', () => {
     expect(state.breakTimeRemainingMs).toBe(0)
   })
 
-  // -----------------------------------------------------------------------
-  // start → waiting
-  // -----------------------------------------------------------------------
+  
 
   it('start sets phase to waiting', () => {
     timer.start(0)
@@ -43,9 +39,7 @@ describe('TwentyTwentyTimer', () => {
     expect(state.breakTimeRemainingMs).toBe(0)
   })
 
-  // -----------------------------------------------------------------------
-  // waiting → break_active (after 20 minutes)
-  // -----------------------------------------------------------------------
+
 
   it('transitions to break_active after 20 minutes', () => {
     timer.start(0)
@@ -63,9 +57,7 @@ describe('TwentyTwentyTimer', () => {
     expect(state.breakTimeRemainingMs).toBe(10_000) // 10s remaining
   })
 
-  // -----------------------------------------------------------------------
-  // break_active → waiting (auto-reset after 20-second break)
-  // -----------------------------------------------------------------------
+
 
   it('auto-resets to waiting after 20-second break completes', () => {
     timer.start(0)
@@ -76,9 +68,7 @@ describe('TwentyTwentyTimer', () => {
     expect(state.breakTimeRemainingMs).toBe(0)
   })
 
-  // -----------------------------------------------------------------------
-  // getTimeUntilBreak
-  // -----------------------------------------------------------------------
+ 
 
   it('getTimeUntilBreak returns correct countdown in seconds', () => {
     timer.start(0)
@@ -96,10 +86,6 @@ describe('TwentyTwentyTimer', () => {
     expect(timer.getTimeUntilBreak(TWENTY_MINUTES_MS + 5_000)).toBe(0)
   })
 
-  // -----------------------------------------------------------------------
-  // getBreakTimeRemaining
-  // -----------------------------------------------------------------------
-
   it('getBreakTimeRemaining returns correct countdown in seconds during break', () => {
     timer.start(0)
     timer.tick(TWENTY_MINUTES_MS) // trigger break
@@ -115,9 +101,7 @@ describe('TwentyTwentyTimer', () => {
     expect(timer.getBreakTimeRemaining(0)).toBe(0)
   })
 
-  // -----------------------------------------------------------------------
-  // stop
-  // -----------------------------------------------------------------------
+
 
   it('stop returns to idle', () => {
     timer.start(0)
@@ -141,9 +125,7 @@ describe('TwentyTwentyTimer', () => {
     expect(timer.getPhase()).toBe('idle')
   })
 
-  // -----------------------------------------------------------------------
-  // Multiple cycles
-  // -----------------------------------------------------------------------
+  
 
   it('runs multiple 20-minute cycles correctly', () => {
     timer.start(0)

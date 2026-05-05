@@ -75,7 +75,6 @@ describe('useBlinkMonitor', () => {
       sessionDurationMs: 60000,
       faceDetected: true,
       reminderState: 'idle',
-      twentyTwentyState: { phase: 'idle', timeUntilBreakMs: 0, breakTimeRemainingMs: 0 },
       remindersTriggered: 0,
     }
 

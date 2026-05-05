@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { StartArgs, StateUpdate } from '../../shared/ipc-messages'
-import type { ReminderState, TwentyTwentyState } from '../../domain/types'
+import type { ReminderState } from '../../domain/types'
 
 // The state exposed by useBlinkMonitor to React components
 export interface BlinkMonitorState {
@@ -10,7 +10,6 @@ export interface BlinkMonitorState {
   sessionDurationMs: number
   faceDetected: boolean
   reminderState: ReminderState
-  twentyTwentyState: TwentyTwentyState
   remindersTriggered: number
   error?: string
 }
@@ -23,11 +22,18 @@ const initialState: BlinkMonitorState = {
   sessionDurationMs: 0,
   faceDetected: false,
   reminderState: 'idle',
-  twentyTwentyState: { phase: 'idle', timeUntilBreakMs: 0, breakTimeRemainingMs: 0 },
   remindersTriggered: 0,
 }
 
-// Custom React hook that bridges Electron IPC events into React state
+/**
+ * React hook that exposes the live blink monitoring state to components.
+ *
+ * Subscribes to StateUpdate events from the main process via the preload
+ * IPC bridge and mirrors them into React state. Also exposes start() and
+ * stop() helpers that forward to the corresponding IPC calls.
+ *
+ * @returns BlinkMonitorState fields plus { start, stop } as one flat object.
+ */
 export function useBlinkMonitor() {
   const [state, setState] = useState<BlinkMonitorState>(initialState)
 
@@ -42,16 +48,17 @@ export function useBlinkMonitor() {
         sessionDurationMs: update.sessionDurationMs,
         faceDetected: update.faceDetected,
         reminderState: update.reminderState,
-        twentyTwentyState: update.twentyTwentyState,
         remindersTriggered: update.remindersTriggered,
         error: update.error,
       })
     })
-    // Return the unsubscribe function as the useEffect cleanup
+ 
     return unsubscribe
+    // Subscribe once on mount; setState is stable so it doesn't need to be a dep.
   }, []) 
 
-  // Wrap IPC calls in useCallback so they maintain a stable function reference across re-renders
+  // useCallback stops start and stop from being recreated on every
+  // render, which would cause components using them to re-render too.
   const start = useCallback(async (args?: StartArgs) => {
     await window.blinkBuddy.start(args)
   }, [])
@@ -60,6 +67,7 @@ export function useBlinkMonitor() {
     await window.blinkBuddy.stop()
   }, [])
 
-  // Spread all state fields plus start/stop functions into one flat object
+  // Flatten state and the action functions into one object so 
+  // consumers can access them directly 
   return { ...state, start, stop }
 }

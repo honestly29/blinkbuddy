@@ -39,13 +39,14 @@ const modelFile = path.join(projectRoot, 'python', 'models', 'face_landmarker_v2
 const setupModelScript = path.join(projectRoot, 'scripts', 'setup_model.py')
 const specFile = path.join(projectRoot, 'blinkbuddy-service.spec')
 const distDir = path.join(projectRoot, 'python-dist')
-const workDir = path.join(projectRoot, 'build')   // PyInstaller's temporary work folder
+// PyInstaller's temporary work folder
+const workDir = path.join(projectRoot, 'build')   
 const outputBinary = path.join(distDir, 'blinkbuddy-service', 'blinkbuddy-service')
 
 
 /**
  * Helper function that runs a command and handles errors for us.
- * Prints the command so you can see what's happening, shows the
+ * Prints the command so we can see what's happening, shows the
  * command's output live in the terminal, and stops the whole 
  * script if the command fails. 
  */
@@ -53,7 +54,7 @@ function run(cmd, args, opts = {}) {
   const printable = `${cmd} ${args.join(' ')}`
   console.log(`> ${printable}`)
   const result = spawnSync(cmd, args, {
-    stdio: 'inherit',  // makes the command's output appears in our terminal as it happens
+    stdio: 'inherit',  // makes the command's output appear in our terminal as it happens
     cwd: projectRoot,
     ...opts,
   })
@@ -68,6 +69,10 @@ function run(cmd, args, opts = {}) {
 
 /**
  * Step 1: Set up a Python environment with the tools PyInstaller needs.
+ *
+ * Build-time tools live in their own venv (.venv-build/) so they
+ * stay separate from the runtime Python and don't end up in the
+ * bundled app.
  */
 function ensureBuildVenv() {
   // Only create the venv if it doesn't already exist.
@@ -89,7 +94,6 @@ function ensureBuildVenv() {
  */
 function ensureModel() {
   if (existsSync(modelFile)) {
-    // File's already here - nothing to do.
     return
   }
   console.log('FaceLandmarker model missing - running scripts/setup_model.py ...')
@@ -160,9 +164,9 @@ function runPyInstaller() {
   run(venvPyinstaller, [
     specFile,
     '--clean',      // wipes PyInstaller's own cache
-    '--noconfirm',
-    '--distpath', distDir,
-    '--workpath', path.join(workDir, 'pyinstaller'),
+    '--noconfirm',  // overwrites existing output without prompting
+    '--distpath', distDir,  // where to put the final bundle
+    '--workpath', path.join(workDir, 'pyinstaller'),  // where to put temp files
   ])
 }
 

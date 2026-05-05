@@ -11,7 +11,8 @@ import type { ReminderStrategy } from './types'
  */
 export class ReminderDispatcher {
   private strategies: ReminderStrategy[]
-  // Stores the last `active` value that update() was called with. Used to detect changes.
+  // Last `active` value seen by update(). Used to detect transitions
+  // when the next call comes in.
   private wasActive = false
 
   constructor(strategies: ReminderStrategy[] = []) {
@@ -39,7 +40,9 @@ export class ReminderDispatcher {
     // If `active` matches `wasActive`, do nothing.
   }
 
-  // Used by Session Manager to fetch the overlay strategy so it can read the strategy's `active` field.
+  // Look up a registered strategy by id. Used by ipc-handlers to decide
+  // whether to instantiate, reconfigure, or remove a strategy when the
+  // user toggles or adjusts its settings.
   getStrategy<T extends ReminderStrategy>(id: string): T | undefined {
     return this.strategies.find((s) => s.id === id) as T | undefined
   }
@@ -95,7 +98,9 @@ export class ReminderDispatcher {
   }
 
   
-  // Like deactivate(), but treats the transition as a user-driven cancellation rather than a natural end. 
+  // Like deactivate(), but for user-driven cancellation. Strategies can
+  // implement onReminderCancel to suppress completion feedback (only
+  // TwentyTwentyAudioStrategy does, to skip its end-of-break chime).
   cancel(): void {
     if (this.wasActive) {
       this.wasActive = false

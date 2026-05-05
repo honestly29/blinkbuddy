@@ -14,7 +14,7 @@
  */
 
 import type { CameraInfo, PythonEvent } from './protocol'
-import type { ReminderState, TwentyTwentyState } from '../domain/types'
+import type { ReminderState } from '../domain/types'
 import type { ReminderStrategyId } from './reminder-strategies'
 
 // ---------------------------------------------------------------------------
@@ -149,7 +149,6 @@ export interface StateUpdate {
   totalBlinks: number
   sessionDurationMs: number
   faceDetected: boolean
-  twentyTwentyState: TwentyTwentyState
   remindersTriggered: number
   error?: string
 }

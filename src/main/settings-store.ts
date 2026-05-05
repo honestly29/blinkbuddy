@@ -61,11 +61,11 @@ export class SettingsStore {
     // Cast to a generic record so we can access properties by name
     const obj = parsed as Record<string, unknown>
 
-    // Blink window: must be a number within the allowed range [5, 300]
+    // Blink window: must be a number within the allowed range [3, 60]
     const blinkWindowSeconds =
       typeof obj.blinkWindowSeconds === 'number' &&
-      obj.blinkWindowSeconds >= 5 &&
-      obj.blinkWindowSeconds <= 300
+      obj.blinkWindowSeconds >= 3 &&
+      obj.blinkWindowSeconds <= 60
         ? obj.blinkWindowSeconds
         : DEFAULT_SETTINGS.blinkWindowSeconds
 
