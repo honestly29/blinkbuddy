@@ -65,15 +65,6 @@ app.whenReady().then(() => {
     strategies.push(s)
   }
 
-  if (prefs.screenEdgeGlow.enabled) {
-    const s = new ScreenEdgeGlowStrategy()
-    // Configure before adding, so the strategy has its saved 
-    // settings applied before the dispatcher can call
-    // onReminderStart on it.
-    s.configure({ colour: prefs.screenEdgeGlow.colour, opacity: prefs.screenEdgeGlow.opacity })
-    strategies.push(s)
-  }
-
   if (prefs.cornerPopup.enabled) {
     const s = new CornerPopupStrategy()
     s.configure({ corner: prefs.cornerPopup.corner })
