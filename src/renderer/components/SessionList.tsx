@@ -1,11 +1,12 @@
 import type { SessionSummary } from '../../shared/ipc-messages'
+import { HEALTHY_BLINK_RATE } from '../../domain/session-history'
 import {
   formatDuration,
   formatSessionTime,
   groupSessionsByDay,
-  HEALTHY_BLINK_RATE,
   type SessionGroup,
 } from './session-stats'
+
 
 
 /**

@@ -4,11 +4,11 @@ import { SummaryCard } from './SummaryCard'
 import { BlinkRateChart } from './BlinkRateChart'
 import { SessionList } from './SessionList'
 import {
-  computeOverviewStats,
-  formatTotalTime,
   HEALTHY_BLINK_RATE,
   MIN_SESSION_SECONDS,
-} from './session-stats'
+  computeOverviewStats,
+} from '../../domain/session-history'
+import { formatTotalTime } from './session-stats'
 
 
 /**

@@ -54,3 +54,20 @@ export interface ReminderTransitionResult {
   shouldShowReminder: boolean
   shouldResetTimer: boolean
 }
+
+// ---------------------------------------------------------------------------
+// Session summaries (post-session aggregate)
+// ---------------------------------------------------------------------------
+
+/** Summary of a completed monitoring session, persisted to disk by SessionLogger. */
+export interface SessionSummary {
+  sessionStart: string    // ISO 8601 timestamp
+  sessionEnd: string      // ISO 8601 timestamp
+  totalBlinks: number
+  avgBlinksPerMinute: number
+  remindersTriggered: number
+  totalDurationSeconds: number
+  twentyTwentyBreaksTaken: number
+  longestGapBetweenBlinks: number
+  blinkRateStdDev: number
+}

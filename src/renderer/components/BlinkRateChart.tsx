@@ -1,5 +1,6 @@
 import type { SessionSummary } from '../../shared/ipc-messages'
-import { computeDailyRates, formatTotalTime, HEALTHY_BLINK_RATE } from './session-stats'
+import { HEALTHY_BLINK_RATE } from '../../domain/session-history'
+import { computeDailyRates, formatTotalTime } from './session-stats'
 
 
 /**

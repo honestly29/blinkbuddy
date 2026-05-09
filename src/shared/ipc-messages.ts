@@ -118,18 +118,11 @@ export type ClearSessionsResult =
   | { status: 'error'; message: string }
 
 
-/** Summary of a completed monitoring session, persisted to disk by SessionLogger. */
-export interface SessionSummary {
-  sessionStart: string    // ISO 8601 timestamp
-  sessionEnd: string      // ISO 8601 timestamp
-  totalBlinks: number
-  avgBlinksPerMinute: number
-  remindersTriggered: number
-  totalDurationSeconds: number
-  twentyTwentyBreaksTaken: number
-  longestGapBetweenBlinks: number
-  blinkRateStdDev: number
-}
+// SessionSummary is a domain concept and lives in src/domain/types. 
+// Re-imported and re-exported here because it's part of the IPC 
+// contract via getSessionHistory().
+import type { SessionSummary } from '../domain/types'
+export type { SessionSummary }
 
 // ---------------------------------------------------------------------------
 // Consolidated state update pushed from Session Manager to renderer
