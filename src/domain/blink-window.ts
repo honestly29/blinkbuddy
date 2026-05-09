@@ -52,7 +52,7 @@ export class BlinkWindow {
     return this.started
   }
 
-  /** Update the blink window duration. Clamped to 5-300 seconds. */
+  /** Update the blink window duration. Clamped to 3-60 seconds. */
   setWindowSeconds(t: number): void {
     this.windowMs = clampWindow(t) * 1000
   }

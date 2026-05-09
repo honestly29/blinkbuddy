@@ -8,7 +8,7 @@
  * - Run 1-second interval for overdue checks and 20-20-20 timer
  * - Manage reminder state transitions
  * - Handle Python error/status events for clean session lifecycle
- * - Enforce startup timeout (10s) so the UI never hangs
+ * - Enforce startup timeout (45s) so the UI never hangs
  * - Throttle state updates to ~10/s to prevent IPC flooding
  * - Push consolidated state to renderer via sendToRenderer callback
  */

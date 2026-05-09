@@ -9,7 +9,7 @@
  * code path that used the wrong string actually ran.
  *
  * Centralising the IDs here means TypeScript treats them as a closed
- * set: the only valid values are the six in REMINDER_STRATEGY_IDS
+ * set: the only valid values are the four in REMINDER_STRATEGY_IDS
  * below. Anywhere a strategy ID is used (a class field, a function
  * parameter, a React prop), it gets typed as ReminderStrategyId, and a
  * typo is rejected at compile time rather than at runtime.
@@ -60,7 +60,7 @@ export type BlinkReminderStrategyId = typeof BLINK_REMINDER_STRATEGY_IDS[number]
 
 
 /**
- * Returns true if `value` is one of the six known strategy IDs.
+ * Returns true if `value` is one of the four known strategy IDs.
  *
  * Used at IPC boundaries (where messages cross between processes,
  * e.g. from the renderer to the main process). The receiving side
