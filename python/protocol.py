@@ -127,7 +127,7 @@ def make_tracking_status(face_detected, quality, timestamp):
 
     Args:
         face_detected: Whether a face is currently tracked.
-        quality: MediaPipe confidence 0-1.
+        quality: placeholder field (hardcoded to 1.0 when a face is detected and 0.0 otherwise).
         timestamp: Unix timestamp in milliseconds.
     """
     return {
